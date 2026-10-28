@@ -5,6 +5,7 @@ import * as db from '../../db.js';
 import { WORDS } from '../../data/words.js';
 import { UserError } from '../../utils/helpers.js';
 import { countStartingWith, isWord, ready } from './dictionary.js';
+import { hasRound } from './flags.js';
 import { WORD_RE, clean, pick } from './text.js';
 
 const COLOR_GAME = 0x5865f2;
@@ -65,6 +66,7 @@ export async function start(channel) {
   await ready();
   const all = games(channel.guild.id);
   if (all[channel.id]) throw new UserError('Kaladont već traje u ovom kanalu. Zaustavi ga s `/kaladont stop`.');
+  if (hasRound(channel.id)) throw new UserError('U ovom kanalu traje pogađanje zastava. Pokreni kaladont u drugom kanalu.');
   const game = newGame();
   all[channel.id] = game;
   db.save();

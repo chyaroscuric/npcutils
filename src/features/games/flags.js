@@ -1,6 +1,7 @@
 // "Pogodi državu": the bot shows a flag, the first person to type the country's name wins.
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
 import { CONTINENTS, COUNTRIES, flagUrl } from '../../data/countries.js';
+import * as db from '../../db.js';
 import { UserError, fail } from '../../utils/helpers.js';
 import { normalize, pick } from './text.js';
 
@@ -10,6 +11,8 @@ const COLOR_WIN = 0x57f287;
 const COLOR_LOST = 0x4f545c;
 
 const rounds = new Map(); // channelId -> round
+
+export const hasRound = (channelId) => rounds.has(channelId);
 const lastCountry = new Map(); // channelId -> iso2, so the same flag does not come twice in a row
 
 export const continentLabel = (key) => CONTINENTS[key] ?? 'Svi kontinenti';
@@ -58,6 +61,10 @@ const againRow = (continent) =>
 
 export async function startRound(channel, continent) {
   if (rounds.has(channel.id)) throw new UserError('U ovom kanalu već traje igra. Pogodi zastavu ili klikni Preskoči.');
+  // both games read every message, so they cannot share a channel
+  if (db.guild(channel.guild.id).kaladont?.[channel.id]) {
+    throw new UserError('U ovom kanalu traje kaladont. Igraj zastave u drugom kanalu ili zaustavi kaladont s `/kaladont stop`.');
+  }
   const round = { country: pickCountry(channel.id, continent), continent, startedAt: Date.now(), hint: false };
   rounds.set(channel.id, round);
   lastCountry.set(channel.id, round.country.iso2);
@@ -113,8 +120,8 @@ export async function handleComponent(interaction) {
 
   if (action === 'again') {
     if (rounds.has(channel.id)) return fail(interaction, 'Igra u ovom kanalu već traje.');
-    await interaction.update({ components: [] });
     await startRound(channel, arg === 'svi' ? null : arg);
+    await interaction.update({ components: [] });
     return;
   }
 
