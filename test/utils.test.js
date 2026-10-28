@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseDuration } from '../src/utils/duration.js';
-import { fillTemplate } from '../src/utils/helpers.js';
-import { emojiKey, parseEmoji } from '../src/features/reactionRoles.js';
+import { parseDuration } from '../src/utils/duration.mjs';
+import { fillTemplate } from '../src/utils/helpers.mjs';
+import { emojiKey, parseEmoji } from '../src/features/reactionRoles.mjs';
 
 test('parseDuration', () => {
   assert.equal(parseDuration('10s'), 10_000);
@@ -31,7 +31,7 @@ test('parseEmoji', () => {
 });
 
 test('reply edits a deferred response, then follows up', async () => {
-  const { reply } = await import('../src/utils/helpers.js');
+  const { reply } = await import('../src/utils/helpers.mjs');
   const calls = [];
   const interaction = {
     deferred: true,

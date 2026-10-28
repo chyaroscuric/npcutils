@@ -1,5 +1,5 @@
 // Loads every command and validates it against Discord's limits (toJSON throws on invalid builders).
-import { loadCommands } from '../src/loadCommands.js';
+import { loadCommands } from '../src/loadCommands.mjs';
 
 const commands = await loadCommands();
 for (const [name, command] of commands) {

@@ -5,13 +5,13 @@ import path from 'node:path';
 import test from 'node:test';
 
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'jaankeza-games-'));
-const { COUNTRIES, CONTINENTS } = await import('../src/data/countries.js');
-const { WORDS } = await import('../src/data/words.js');
-const { isCorrect } = await import('../src/features/games/flags.js');
-const { score, validateGuess } = await import('../src/features/games/wordle.js');
-const { checkMove } = await import('../src/features/games/kaladont.js');
-const { isWord, useWords } = await import('../src/features/games/dictionary.js');
-const { shipPercent, shipName } = await import('../src/features/games/ship.js');
+const { COUNTRIES, CONTINENTS } = await import('../src/data/countries.mjs');
+const { WORDS } = await import('../src/data/words.mjs');
+const { isCorrect } = await import('../src/features/games/flags.mjs');
+const { score, validateGuess } = await import('../src/features/games/wordle.mjs');
+const { checkMove } = await import('../src/features/games/kaladont.mjs');
+const { isWord, useWords } = await import('../src/features/games/dictionary.mjs');
+const { shipPercent, shipName } = await import('../src/features/games/ship.mjs');
 
 test('country data is complete', () => {
   assert.ok(COUNTRIES.length >= 195);

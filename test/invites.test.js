@@ -6,8 +6,8 @@ import test from 'node:test';
 import { Collection } from 'discord.js';
 
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'jaankeza-utils-'));
-const db = await import('../src/db.js');
-const invites = await import('../src/features/invites.js');
+const db = await import('../src/db.mjs');
+const invites = await import('../src/features/invites.mjs');
 db.load();
 
 function fakeGuild(list) {

@@ -203,10 +203,11 @@ Može se koristiti i na bilo kojoj postojećoj poruci (desni klik → *Copy Mess
 
 ```
 src/
-  index.js            # pokretanje, eventi, registracija komandi
-  db.js               # JSON baza (data/db.json)
+  index.js            # pokretač (radi i kad hosting pokreće bota kao CommonJS, npr. tsx na Pterodactylu)
+  main.mjs            # pokretanje, eventi, registracija komandi
+  db.mjs              # JSON baza (data/db.json)
   commands/           # slash komande
-  features/           # logika: stats, tickets, invites, members (welcome/autorole/boost), reactionRoles, giveaways, music
-  dashboard/          # server.js (Express API + Discord login) i public/ (sučelje)
+  features/           # logika: stats, tickets, invites, members, reactionRoles, giveaways, music, moderation, antinuke, games/
+  dashboard/          # server.mjs (Express API + Discord login) i public/ (sučelje)
 test/                 # npm test, npm run check
 ```
