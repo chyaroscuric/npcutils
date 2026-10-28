@@ -499,6 +499,7 @@ export function startDashboard(client, port) {
       rules: Object.entries(antinuke.RULES).map(([key, r]) => ({ key, label: r.label, limited: r.limited })),
       punishments: Object.entries(antinuke.PUNISHMENTS).map(([key, label]) => ({ key, label })),
       config: antinuke.getConfig(req.guild.id),
+      whitelistMembers: antinuke.getConfig(req.guild.id).whitelistUsers.map((id) => userInfo(req.guild, id)),
       incidents: antinuke.incidents(req.guild.id),
     });
   });

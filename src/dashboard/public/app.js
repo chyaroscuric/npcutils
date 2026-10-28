@@ -902,11 +902,16 @@
       { key: 'invites', label: 'Invite-ovi', icon: 'ti-user-share' },
       { key: 'stats', label: 'Statistika', icon: 'ti-chart-bar' },
     ] },
+    { group: 'Sigurnost', items: [
+      { key: 'antinuke', label: 'Anti-nuke', icon: 'ti-shield' },
+      { key: 'moderation', label: 'Moderacija', icon: 'ti-gavel' },
+    ] },
     { group: 'Alati', items: [
       { key: 'tickets', label: 'Tiketi', icon: 'ti-ticket' },
       { key: 'reactionroles', label: 'Reaction role', icon: 'ti-mood-smile' },
       { key: 'giveaways', label: 'Giveaway', icon: 'ti-gift' },
       { key: 'music', label: 'Glazba', icon: 'ti-music' },
+      { key: 'games', label: 'Igre', icon: 'ti-device-gamepad-2' },
     ] },
   ];
   const PAGE_KEYS = NAV.flatMap((g) => g.items.map((i) => i.key));
@@ -1089,6 +1094,22 @@
 
   async function router() {
     if (!state.me) return;
+    // Unsaved-changes guard (anti-nuke form): put the old hash back and ask first.
+    if (state.leaveGuard && location.hash !== state.currentHash && state.leaveGuard()) {
+      const target = location.hash;
+      history.replaceState(null, '', `${location.pathname}${location.search}${state.currentHash || ''}`);
+      closeMenus();
+      closeDrawer(false);
+      confirmAction({
+        title: 'Odbaciti nespremljene promjene?',
+        text: 'Promjene na ovoj stranici nisu spremljene. Ako odeš, izgubit ćeš ih.',
+        confirmLabel: 'Odbaci promjene',
+        onConfirm() { state.leaveGuard = null; location.hash = target; },
+      });
+      return;
+    }
+    state.currentHash = location.hash;
+    state.leaveGuard = null;
     const token = ++state.navToken;
     runCleanups();
     closeMenus();
@@ -1206,6 +1227,7 @@
     join: 'ti-user-plus', leave: 'ti-user-minus', boost: 'ti-rocket',
     ticket_open: 'ti-ticket', ticket_close: 'ti-ticket-off',
     giveaway_start: 'ti-gift', giveaway_end: 'ti-confetti', music: 'ti-music',
+    antinuke: 'ti-shield', moderation: 'ti-gavel',
   };
   async function pageOverview(ctx) {
     ctx.head = pageHead('Pregled', ctx.guild.name);
@@ -1229,6 +1251,9 @@
       { page: 'welcome', name: 'Automatske role', on: c.autoroles.length > 0, meta: c.autoroles.length ? count(c.autoroles.length, 'rola', 'role', 'rola') : 'Nema automatskih rola' },
       { page: 'stats', name: 'Kanali statistike', on: c.stats.enabled, meta: c.stats.enabled ? 'Članovi, botovi i boostovi' : 'Nisu postavljeni' },
       { page: 'tickets', name: 'Tiketi', on: c.tickets.enabled, meta: c.tickets.enabled ? count(c.tickets.openCount || 0, 'otvoren tiket', 'otvorena tiketa', 'otvorenih tiketa') : 'Članovi ne mogu otvoriti tiket' },
+      { page: 'antinuke', name: 'Anti-nuke', on: !!(c.antinuke && c.antinuke.enabled), meta: c.antinuke && c.antinuke.enabled ? 'Masovne štetne radnje se kažnjavaju' : 'Server nije zaštićen od nukea' },
+      { page: 'moderation', name: 'Zapisnik moderacije', on: !!c.modLogChannelId, meta: c.modLogChannelId ? chan(c.modLogChannelId) : 'Moderatorske radnje se ne bilježe' },
+      { page: 'games', name: 'Kaladont', on: (c.kaladontCount || 0) > 0, meta: c.kaladontCount ? `Igra se u ${count(c.kaladontCount, 'kanalu', 'kanala', 'kanala')}` : 'Ne igra se ni u jednom kanalu' },
     ];
     const activity = g.activity || [];
     const showAll = state.page.showAllActivity;
@@ -1724,15 +1749,11 @@
     const { ctx, lb } = state.page;
     ctx.head = pageHead('Invite-ovi', 'Ukupno = pozvani − otišli + bonus. Lažni su računi mlađi od 7 dana i ne broje se.',
       lb.length ? html`<button type="button" class="btn" data-action="invites-reset-all">Resetiraj sve</button>` : '');
-    const sid = 'member-search';
     mount(ctx.el, html`${ctx.head}
       <section class="card" aria-labelledby="lb-h">
         <div class="card-head"><div><h2 class="card-title" id="lb-h">Ljestvica <span class="count num">${fmtNum(lb.length)}</span></h2>
           <p class="card-desc">Bonus dodaješ ikonom olovke ili pretragom člana koji nije na ljestvici.</p></div>
-          <div class="search-wrap">
-            <div class="input-wrap">${icon('ti-search', 'ti-sm')}<input class="input" id="${sid}" type="search" placeholder="Pronađi člana" aria-label="Pronađi člana za bonus" autocomplete="off" spellcheck="false" aria-controls="member-results" aria-expanded="false" data-member-search></div>
-            <div class="menu" id="member-results" data-input="${sid}" hidden></div>
-          </div>
+          ${memberSearch('invites', 'Pronađi člana za bonus')}
         </div>
         <div id="lb-body">${lbBody()}</div>
       </section>`);
@@ -1849,15 +1870,32 @@
       },
     });
   };
-  // Member search (debounced) -> pick -> bonus modal
+  // Member search (debounced) -> pick. Each search box has a key; memberPickers[key]
+  // decides what picking does and can mark members that cannot be picked.
+  const memberPickers = Object.create(null);
+  memberPickers.invites = { pick: (user) => bonusModal(user) };
+  function memberSearch(key, ariaLabel, cls = '') {
+    const sid = `ms-${key}`, mid = `ms-${key}-results`;
+    return html`<div class="search-wrap ${cls}">
+      <div class="input-wrap">${icon('ti-search', 'ti-sm')}<input class="input" id="${sid}" type="search" placeholder="Pronađi člana" aria-label="${ariaLabel}" autocomplete="off" spellcheck="false" aria-controls="${mid}" aria-expanded="false" data-member-search="${key}"></div>
+      <div class="menu" id="${mid}" data-input="${sid}" hidden></div>
+    </div>`;
+  }
+  const searchMenu = (input) => document.getElementById(input.getAttribute('aria-controls'));
+  function closeMemberSearch(input) {
+    const menu = searchMenu(input);
+    if (menu) menu.hidden = true;
+    input.setAttribute('aria-expanded', 'false');
+  }
   let searchTimer = 0, searchSeq = 0;
   document.addEventListener('input', (e) => {
     if (!e.target.matches('[data-member-search]')) return;
     const input = e.target;
-    const menu = $('#member-results');
+    const key = input.dataset.memberSearch;
+    const menu = searchMenu(input);
     clearTimeout(searchTimer);
     const q = input.value.trim();
-    if (q.length < 2) { menu.hidden = true; input.setAttribute('aria-expanded', 'false'); return; }
+    if (q.length < 2) { closeMemberSearch(input); return; }
     searchTimer = setTimeout(async () => {
       const seq = ++searchSeq;
       const { g } = state.page;
@@ -1868,9 +1906,13 @@
         const res = await api('GET', g$(g.id, `/members?q=${encodeURIComponent(q)}`));
         if (seq !== searchSeq || !menu.isConnected) return;
         const list = res.members || [];
+        const picker = memberPickers[key] || {};
         mount(menu, list.length
-          ? html`${list.map((m) => html`<button type="button" class="menu-item" data-action="member-pick" data-id="${m.id}" data-name="${m.name}" data-avatar="${m.avatarUrl || ''}">
-              ${avatar(m.avatarUrl, m.name, 'avatar-sm')}<span class="truncate">${m.name} <span class="menu-sub">@${m.username}</span></span></button>`)}`
+          ? html`${list.map((m) => {
+              const taken = picker.taken ? picker.taken(m.id) : null;
+              return html`<button type="button" class="menu-item" data-action="member-pick" data-picker="${key}" data-id="${m.id}" data-name="${m.name}" data-avatar="${m.avatarUrl || ''}" ${taken ? raw('aria-disabled="true"') : ''}>
+                ${avatar(m.avatarUrl, m.name, 'avatar-sm')}<span class="truncate">${m.name} <span class="menu-sub">${taken || `@${m.username}`}</span></span></button>`;
+            })}`
           : html`<p class="select-empty">Nema članova za „${q}”.</p>`);
       } catch (err) {
         if (seq !== searchSeq || !menu.isConnected) return;
@@ -1880,21 +1922,26 @@
   });
   document.addEventListener('keydown', (e) => {
     if (e.target.matches && e.target.matches('[data-member-search]')) {
-      const menu = $('#member-results');
+      const menu = searchMenu(e.target);
       if (e.key === 'ArrowDown' && menu && !menu.hidden) { e.preventDefault(); $('.menu-item', menu)?.focus(); }
-      if (e.key === 'Escape' && menu) { menu.hidden = true; e.target.setAttribute('aria-expanded', 'false'); }
+      if (e.key === 'Escape') closeMemberSearch(e.target);
+      if (e.key === 'Enter') e.preventDefault(); // never submit the surrounding form
+      return;
     }
+    const wrap = e.key === 'Escape' && e.target.closest && e.target.closest('.search-wrap');
+    if (wrap) { const input = $('[data-member-search]', wrap); if (input) closeMemberSearch(input); }
   });
   document.addEventListener('click', (e) => {
-    const menu = $('#member-results');
-    if (menu && !menu.hidden && !e.target.closest('.search-wrap')) { menu.hidden = true; $('[data-member-search]')?.setAttribute('aria-expanded', 'false'); }
+    $$('[data-member-search][aria-expanded="true"]').forEach((input) => {
+      if (!input.closest('.search-wrap').contains(e.target)) closeMemberSearch(input);
+    });
   });
   actions['member-pick'] = (btn) => {
-    const menu = $('#member-results');
-    if (menu) menu.hidden = true;
-    const input = $('[data-member-search]');
-    if (input) { input.value = ''; input.setAttribute('aria-expanded', 'false'); }
-    bonusModal({ id: btn.dataset.id, name: btn.dataset.name, avatarUrl: btn.dataset.avatar || null });
+    const key = btn.dataset.picker;
+    const input = $(`[data-member-search="${CSS.escape(key)}"]`);
+    if (input) { input.value = ''; closeMemberSearch(input); input.focus(); }
+    const picker = memberPickers[key];
+    if (picker) picker.pick({ id: btn.dataset.id, name: btn.dataset.name, avatarUrl: btn.dataset.avatar || null });
   };
 
   // ---------- Reaction roles ----------
@@ -2464,6 +2511,534 @@
     pollMusic(false);
   };
 
+  // ---------- Anti-nuke ----------
+  // limit = the action count (within windowSec) at which the punishment happens; 0 and 1 both mean the first action.
+  function limitHint(v) {
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 0 || n > 50) return 'od 0 do 50';
+    return n <= 1 ? 'kazna već kod 1. akcije' : `kazna kod ${n}. akcije`;
+  }
+  // Croatian explanation under each rule label (the labels come from the API).
+  const AN_DESC = {
+    ban: 'Ban člana', kick: 'Izbacivanje člana', roleCreate: 'Stvaranje role', roleDelete: 'Brisanje role',
+    channelCreate: 'Stvaranje kanala', channelDelete: 'Brisanje kanala', mention: 'Poruka s @everyone ili @here',
+    botAdd: 'Dodavanje bota na server', prune: 'Prune: masovno izbacivanje neaktivnih članova',
+    dangerousRoleUpdate: 'Roli se dodaju opasne dozvole, npr. Administrator ili Ban',
+    dangerousRoleAdd: 'Član dobije rolu s opasnim dozvolama',
+  };
+  async function pageAntinuke(ctx) {
+    ctx.head = pageHead('Anti-nuke', 'Kažnjava člana koji u kratkom vremenu masovno bana, briše kanale i role ili dodaje botove.');
+    mount(ctx.el, html`${ctx.head}<div class="cols cols-form-right"><div class="stack">${skelCard(300)}${skelCard(520)}</div><div class="stack">${skelCard(260)}${skelCard(320)}</div></div>`);
+    const res = await ctx.load(() => Promise.all([guildData(ctx.gid), api('GET', g$(ctx.gid, '/antinuke'))]));
+    if (!res) return;
+    const [g, an] = res;
+    const names = new Map();
+    for (const i of an.incidents || []) if (i.executor && i.executor.name) names.set(i.executor.id, { name: i.executor.name, avatarUrl: null });
+    if (an.owner) names.set(an.owner.id, an.owner);
+    for (const u of an.whitelistMembers || []) names.set(u.id, u);
+    Object.assign(state.page, { g, ctx, an, names, wlUsers: [...(an.config.whitelistUsers || [])] });
+    drawAntinuke();
+    state.leaveGuard = anDirty;
+  }
+  memberPickers.antinuke = {
+    taken(id) {
+      const { an, wlUsers } = state.page;
+      if (an && an.owner && an.owner.id === id) return 'vlasnik, uvijek izuzet/a';
+      return wlUsers && wlUsers.includes(id) ? 'već izuzet/a' : null;
+    },
+    pick(user) {
+      const { wlUsers, names } = state.page;
+      if (!wlUsers || wlUsers.includes(user.id)) return;
+      wlUsers.push(user.id);
+      names.set(user.id, { name: user.name, avatarUrl: user.avatarUrl });
+      redrawWl();
+    },
+  };
+  function drawAntinuke() {
+    const { g, ctx, an } = state.page;
+    const c = an.config;
+    const ro = !an.canEdit;
+    const rules = an.rules || [];
+    const id = { log: uid('f'), win: uid('f'), roles: uid('f') };
+    const warn = [];
+    if (an.botCanSeeAuditLog === false) warn.push(['Bot ne vidi zapisnik revizije', 'U Discordu daj botu dozvolu View Audit Log, najbolje Administrator. Bez nje anti-nuke ne zna tko je napravio radnju i ne reagira.']);
+    if (an.botRoleIsHighest === false) warn.push(['Rola bota nije najviša', 'U postavkama servera, pod Role, povuci rolu bota na vrh. Inače ne može kazniti člana čija je rola iznad njegove.']);
+    const callout = !warn.length ? '' : html`<div class="callout callout-warning page-callout">${icon('ti-alert-triangle')}<div>
+      ${warn.length === 1
+        ? html`<p class="callout-title">${warn[0][0]}</p><p class="callout-body">${warn[0][1]}</p>`
+        : html`<p class="callout-title">Bot ne može potpuno zaštititi server</p><ul class="callout-body callout-list">${warn.map(([t, b]) => html`<li><span class="strong">${t}.</span> ${b}</li>`)}</ul>`}
+    </div></div>`;
+    const roNote = ro ? html`<p class="ro-note">${icon('ti-lock', 'ti-sm')}<span>Postavke može mijenjati samo vlasnik servera, <span class="strong">${an.owner ? an.owner.name : 'vlasnik'}</span>. Ti ih možeš samo pregledati.</span></p>` : '';
+    const dis = ro ? raw('disabled') : '';
+    const punOpts = (an.punishments || []).map((p) => ({ value: p.key, label: p.label }));
+    const win = c.windowSec;
+    const ruleRow = (r) => {
+      const rc = (c.rules && c.rules[r.key]) || { enabled: false, punishment: 'none', limit: 0 };
+      const lid = uid('f'), pid = uid('f');
+      const off = ro || !rc.enabled;
+      return html`<li class="rule" data-rule="${r.key}">
+        <label class="toggle rule-name"><input type="checkbox" role="switch" name="rule-enabled" ${rc.enabled ? raw('checked') : ''} ${dis}><span class="track" aria-hidden="true"></span>
+          <span class="min0">${r.label}${AN_DESC[r.key] ? html`<span class="toggle-desc">${AN_DESC[r.key]}</span>` : ''}</span></label>
+        <div class="rule-ctrls">
+          ${r.limited ? html`<div class="field" data-field="limit-${r.key}"><label class="label rule-label" for="${lid}">Limit<span class="sr-only">, ${r.label}</span></label>
+            <input class="input" id="${lid}" name="rule-limit" type="number" min="0" max="50" step="1" inputmode="numeric" value="${rc.limit ?? 0}" aria-describedby="${lid}-help" ${off ? raw('disabled') : ''}>
+            <p class="help limit-hint num" id="${lid}-help" data-limit-hint>${limitHint(rc.limit)}</p></div>` : ''}
+          <div class="field"><label class="label rule-label" for="${pid}">Kazna<span class="sr-only">, ${r.label}</span></label>
+            ${selectField({ id: pid, name: `pun-${r.key}`, options: punOpts, value: rc.punishment, searchable: false, disabled: off, placeholder: 'Odaberi kaznu', ariaLabel: `Kazna, ${r.label}` })}</div>
+        </div>
+      </li>`;
+    };
+    const limited = rules.filter((r) => r.limited), instant = rules.filter((r) => !r.limited);
+    const wlRoles = c.whitelistRoles || [];
+    mount(ctx.el, html`${ctx.head}${roNote}${callout}
+      <form class="an-form" data-form="antinuke" novalidate>
+        <div class="cols cols-form-right">
+          <div class="stack">
+            <section class="card" aria-labelledby="an-g-h">
+              <div class="card-head"><div><h2 class="card-title" id="an-g-h">Opće postavke</h2><p class="card-desc">Bot prati zapisnik revizije i kažnjava prema pravilima ispod.</p></div><span id="an-badge">${statusBadge(c.enabled)}</span></div>
+              <div class="fields cq">
+                <label class="toggle"><input type="checkbox" role="switch" name="enabled" ${c.enabled ? raw('checked') : ''} ${dis}><span class="track" aria-hidden="true"></span><span>Uključi anti-nuke</span></label>
+                <div class="field-row">
+                  ${field({ name: 'logChannelId', label: 'Kanal za zapise', id: id.log, help: 'Ovdje stiže obavijest o svakom incidentu.',
+                    control: selectField({ id: id.log, name: 'logChannelId', options: [{ value: '', label: 'Bez zapisa', group: '' }, ...textChannelOptions(g)], value: c.logChannelId || '', placeholder: 'Bez zapisa', disabled: ro, describedBy: `${id.log}-help` }) })}
+                  ${field({ name: 'windowSec', label: 'Vremenski prozor u sekundama', id: id.win, help: 'Od 5 do 3600 s. Zadano je 60 s.',
+                    control: html`<input class="input" id="${id.win}" name="windowSec" type="number" min="5" max="3600" step="1" inputmode="numeric" value="${win}" aria-describedby="${id.win}-help" ${dis}>` })}
+                </div>
+                <label class="toggle toggle-top"><input type="checkbox" role="switch" name="revert" ${c.revert ? raw('checked') : ''} ${dis}><span class="track" aria-hidden="true"></span>
+                  <span>Automatski vrati štetu<span class="toggle-desc">Bot skida ban, briše spam kanale i role, ponovno stvara obrisane kanale i role te miče opasne role.</span></span></label>
+              </div>
+            </section>
+            <section class="card" aria-labelledby="an-l-h">
+              <div class="card-head"><div><h2 class="card-title" id="an-l-h">Limit i kazna</h2>
+                <p class="card-desc">Limit je broj akcija u vremenskom prozoru nakon kojeg slijedi kazna. 1 znači da kazna dolazi već kod prve akcije.</p></div></div>
+              <div class="rules-wrap">
+                <div class="rule-head rule-head-limited" aria-hidden="true"><span>Pravilo</span><span>Limit u <span class="num" data-window>${win}</span> s</span><span>Kazna</span></div>
+                <ul class="rules rules-limited">${limited.map(ruleRow)}</ul>
+              </div>
+            </section>
+            <section class="card" aria-labelledby="an-i-h">
+              <div class="card-head"><div><h2 class="card-title" id="an-i-h">Trenutna kazna</h2><p class="card-desc">Ove radnje bot kažnjava odmah, već prvi put.</p></div></div>
+              <div class="rules-wrap">
+                <div class="rule-head rule-head-instant" aria-hidden="true"><span>Pravilo</span><span>Kazna</span></div>
+                <ul class="rules rules-instant">${instant.map(ruleRow)}</ul>
+              </div>
+            </section>
+          </div>
+          <div class="stack">
+            <section class="card" aria-labelledby="an-w-h">
+              <div class="card-head"><div><h2 class="card-title" id="an-w-h">Iznimke</h2><p class="card-desc">Ovi članovi i role ne okidaju anti-nuke. Vlasnik servera i bot uvijek su izuzeti.</p>
+                <p class="card-desc">Moderatore koji trebaju normalno banati i kickati dodaj ovdje, inače ih anti-nuke kazni kad dosegnu limit.</p></div></div>
+              <div class="fields">
+                <div class="field">
+                  <span class="label" id="an-wu-l">Članovi</span>
+                  ${ro ? '' : memberSearch('antinuke', 'Pronađi člana za iznimku', 'is-full')}
+                  <div id="an-wl-users" aria-labelledby="an-wu-l">${wlUserList()}</div>
+                </div>
+                ${ro
+                  ? html`<div class="field"><span class="label">Role</span>${wlRoles.length
+                      ? html`<ul class="chips">${wlRoles.map((rid) => { const r = roleById(g, rid); return html`<li class="tag no-x">${roleDot(r && r.color)}<span class="truncate">${r ? r.name : 'Obrisana rola'}</span></li>`; })}</ul>`
+                      : html`<p class="muted">Nema izuzetih rola.</p>`}</div>`
+                  : field({ name: 'whitelistRoles', label: 'Role', id: id.roles, help: 'Svi članovi s nekom od ovih rola su izuzeti.',
+                      control: selectField({ id: id.roles, name: 'whitelistRoles', multiple: true, options: roleOptions(g), value: wlRoles, placeholder: 'Bez izuzetih rola', emptyText: 'Server nema rola.', describedBy: `${id.roles}-help` }) })}
+              </div>
+            </section>
+            <section class="card" aria-labelledby="an-x-h">
+              <div class="card-head"><div><h2 class="card-title" id="an-x-h">Nedavni incidenti <span class="count num">${fmtNum((an.incidents || []).length)}</span></h2></div></div>
+              ${incidentList()}
+            </section>
+          </div>
+        </div>
+        ${ro ? '' : html`<div class="savebar">
+          <div class="btn-group"><button type="submit" class="btn btn-primary" disabled>Spremi promjene</button><button type="button" class="btn" data-action="an-discard" disabled>Odbaci promjene</button></div>
+          <p class="savebar-status" aria-live="polite">Nema nespremljenih promjena.</p>
+        </div>`}
+      </form>`);
+    const f = $('form[data-form="antinuke"]', ctx.el);
+    state.page.snap = JSON.stringify(anCollect(f));
+  }
+  function wlUserList() {
+    const { wlUsers, names, an } = state.page;
+    const ro = !an.canEdit;
+    if (!wlUsers.length) return html`<p class="muted">Nema izuzetih članova.</p>`;
+    return html`<ul class="plain-list wl-list">${wlUsers.map((uidv) => {
+      const u = names.get(uidv);
+      return html`<li>${avatar(u && u.avatarUrl, u ? u.name : '?', 'avatar-sm')}
+        <span class="row-main">${u
+          ? html`<span class="row-title truncate" style="display:block">${u.name}</span>`
+          : html`${idRow(uidv, 'Kopiraj ID korisnika')}<span class="row-meta" style="display:block">Ime nije dostupno</span>`}</span>
+        ${ro ? '' : html`<button type="button" class="btn-icon" data-action="an-wl-remove" data-id="${uidv}" aria-label="Ukloni ${u ? u.name : uidv} iz iznimki" data-tip="Ukloni iz iznimki">${icon('ti-x')}</button>`}
+      </li>`;
+    })}</ul>`;
+  }
+  function redrawWl() {
+    const box = $('#an-wl-users');
+    if (box) mount(box, wlUserList());
+    anSyncBar();
+  }
+  actions['an-wl-remove'] = (btn) => {
+    const { wlUsers } = state.page;
+    const i = wlUsers.indexOf(btn.dataset.id);
+    if (i < 0) return;
+    wlUsers.splice(i, 1);
+    redrawWl();
+    const next = $('#an-wl-users [data-action="an-wl-remove"]') || $('[data-member-search="antinuke"]');
+    if (next) next.focus();
+  };
+  function incidentList() {
+    const { an } = state.page;
+    const list = [...(an.incidents || [])].sort((a, b) => b.at - a.at);
+    if (!list.length) return emptyState('ti-shield-check', 'Još nema incidenata. Kad anti-nuke nekoga kazni, pojavit će se ovdje.');
+    const pun = Object.fromEntries((an.punishments || []).map((p) => [p.key, p.label]));
+    const limited = Object.fromEntries((an.rules || []).map((r) => [r.key, r.limited]));
+    return html`<ul class="plain-list incidents">${list.map((x) => {
+      const failed = /^nisam/i.test(String(x.result || ''));
+      const name = x.executor ? x.executor.name : 'Nepoznat član';
+      return html`<li>${avatar(null, name, 'avatar-sm')}
+        <span class="row-main">
+          <span class="row-title" style="display:block">${name}<span class="sep">·</span><span class="muted">${x.label}</span></span>
+          <span class="row-meta num" style="display:block">${limited[x.action] && x.count ? html`${count(x.count, 'radnja', 'radnje', 'radnji')}<span class="sep">·</span>` : ''}${pun[x.punishment] || x.punishment}: ${failed ? html`<span class="danger-text">${icon('ti-alert-circle', 'ti-sm')}${x.result}</span>` : x.result}${x.reverted ? html`<span class="sep">·</span>vraćeno ${fmtNum(x.reverted)}` : ''}</span>
+        </span>${timeEl(x.at)}</li>`;
+    })}</ul>`;
+  }
+  function anCollect(f) {
+    const rules = {};
+    $$('[data-rule]', f).forEach((li) => {
+      const r = { enabled: $('[name="rule-enabled"]', li).checked, punishment: $('input[type="hidden"]', li).value };
+      const lim = $('[name="rule-limit"]', li);
+      if (lim) r.limit = lim.value.trim() === '' ? NaN : Number(lim.value);
+      rules[li.dataset.rule] = r;
+    });
+    const wlr = f.elements.whitelistRoles ? multiValue(f, 'whitelistRoles') : (state.page.an.config.whitelistRoles || []);
+    return {
+      enabled: f.elements.enabled.checked,
+      logChannelId: f.elements.logChannelId.value || null,
+      windowSec: f.elements.windowSec.value.trim() === '' ? NaN : Number(f.elements.windowSec.value),
+      revert: f.elements.revert.checked,
+      whitelistUsers: [...state.page.wlUsers].sort(),
+      whitelistRoles: [...wlr].sort(),
+      rules,
+    };
+  }
+  function anDirty() {
+    const f = $('form[data-form="antinuke"]');
+    if (!f || !state.page.an || !state.page.an.canEdit) return false;
+    return JSON.stringify(anCollect(f)) !== state.page.snap;
+  }
+  function anSyncBar() {
+    const bar = $('.savebar');
+    if (!bar) return;
+    const dirty = anDirty();
+    bar.classList.toggle('is-dirty', dirty);
+    $$('.btn', bar).forEach((b) => { if (!b.classList.contains('is-loading')) b.disabled = !dirty; });
+    const st = $('.savebar-status', bar);
+    const text = dirty ? 'Imaš nespremljene promjene.' : 'Nema nespremljenih promjena.';
+    if (st.textContent !== text) st.textContent = text;
+  }
+  inputs.antinuke = (f, e) => {
+    const t = e.target;
+    if (t.name === 'rule-enabled' && state.page.an.canEdit) {
+      const li = t.closest('[data-rule]');
+      const lim = $('[name="rule-limit"]', li);
+      if (lim) lim.disabled = !t.checked;
+      const trig = $('.select-trigger', li);
+      if (trig) trig.disabled = !t.checked;
+    }
+    if (t.name === 'rule-limit') {
+      const hint = $('[data-limit-hint]', t.closest('.field'));
+      if (hint) hint.textContent = limitHint(t.value.trim() === '' ? NaN : t.value);
+    }
+    if (t.name === 'windowSec') {
+      const n = Number(t.value);
+      if (Number.isInteger(n) && n >= 5 && n <= 3600) $$('[data-window]', f).forEach((s) => { s.textContent = fmtNum(n); });
+    }
+    anSyncBar();
+  };
+  actions['an-discard'] = () => {
+    const { an } = state.page;
+    state.page.wlUsers = [...(an.config.whitelistUsers || [])];
+    drawAntinuke();
+    toast('info', 'Promjene su odbačene', 'Vraćene su spremljene postavke.');
+  };
+  forms.antinuke = async (f, btn) => {
+    clearErrors(f);
+    const { g, an } = state.page;
+    if (!an.canEdit || !anDirty()) return;
+    const body = anCollect(f);
+    if (!Number.isInteger(body.windowSec) || body.windowSec < 5 || body.windowSec > 3600) return fieldError(f, 'windowSec', 'Upiši cijeli broj od 5 do 3600.');
+    for (const [key, r] of Object.entries(body.rules)) {
+      if ('limit' in r && (!Number.isInteger(r.limit) || r.limit < 0 || r.limit > 50)) {
+        const lim = $(`[data-rule="${CSS.escape(key)}"] [name="rule-limit"]`, f);
+        if (lim) lim.disabled = false;
+        return fieldError(f, `limit-${key}`, 'Od 0 do 50.');
+      }
+    }
+    let res;
+    const ok = await run(btn, async () => { res = await api('PUT', g$(g.id, '/antinuke'), body); }, 'Spremanje nije uspjelo');
+    if (!ok) return;
+    an.config = (res && res.config) || { ...an.config, ...body };
+    state.page.wlUsers = [...(an.config.whitelistUsers || [])];
+    invalidateGuild(g.id);
+    drawAntinuke();
+    toast('success', 'Promjene su spremljene', an.config.enabled ? 'Anti-nuke je uključen.' : 'Anti-nuke je isključen.');
+  };
+  window.addEventListener('beforeunload', (e) => {
+    if (state.leaveGuard && state.leaveGuard()) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  // ---------- Moderation ----------
+  const MOD_COMMANDS = [
+    ['/purge', 'broj [korisnik] [botovi] [sadrzi]', 'Briše do 100 poruka odjednom, po želji samo od jednog člana, od botova ili s određenim tekstom.'],
+    ['/ban', 'korisnik [razlog] [obrisi_poruke]', 'Banira člana i po želji briše njegove nedavne poruke.'],
+    ['/unban', 'korisnik_id [razlog]', 'Skida ban prema ID-u korisnika.'],
+    ['/kick', 'korisnik [razlog]', 'Izbacuje člana sa servera.'],
+    ['/timeout', 'korisnik trajanje [razlog]', 'Utišava člana na zadano vrijeme, najdulje 28 dana.'],
+    ['/untimeout', 'korisnik', 'Skida timeout.'],
+    ['/warn', 'korisnik razlog', 'Daje upozorenje. Upozorenja se vide na ovoj stranici.'],
+    ['/warnings', 'korisnik', 'Prikazuje upozorenja člana.'],
+    ['/clearwarns', 'korisnik [broj]', 'Briše sva upozorenja člana ili samo jedno, prema broju.'],
+    ['/slowmode', 'trajanje', 'Postavlja slowmode u kanalu, najviše 6 h. Trajanje 0 ga isključuje.'],
+    ['/lock', '[razlog]', 'Zaključava kanal pa članovi u njemu ne mogu pisati.'],
+    ['/unlock', '[razlog]', 'Otključava kanal.'],
+    ['/modlog', '[kanal]', 'Postavlja kanal zapisnika moderacije. Bez kanala ga isključuje.'],
+  ];
+  async function pageModeration(ctx) {
+    ctx.head = pageHead('Moderacija', 'Upozorenja članova i kanal u koji bot bilježi moderatorske radnje.');
+    mount(ctx.el, html`${ctx.head}<div class="areas rest-wide"><div class="area-main">${skelCard(360)}</div><div class="area-side">${skelCard(300)}</div><div class="area-rest">${skelCard(360)}</div></div>`);
+    const res = await ctx.load(() => Promise.all([guildData(ctx.gid), api('GET', g$(ctx.gid, '/moderation'))]));
+    if (!res) return;
+    const [g, mod] = res;
+    Object.assign(state.page, { g, ctx, mod: { modLogChannelId: mod.modLogChannelId || null, warnings: mod.warnings || [] }, open: new Set() });
+    drawModeration();
+  }
+  function drawModeration() {
+    const { g, ctx, mod } = state.page;
+    const id = uid('f');
+    mount(ctx.el, html`${ctx.head}
+      <div class="areas rest-wide">
+        <section class="card area-main" aria-labelledby="wr-h" id="wr-card">${warnCard()}</section>
+          <section class="card area-side" aria-labelledby="ml-h">
+            <div class="card-head"><div><h2 class="card-title" id="ml-h">Zapisnik moderacije</h2><p class="card-desc">Bot ovdje bilježi banove, kickove, timeoute, upozorenja i zaključavanja kanala.</p></div><span id="ml-badge">${statusBadge(!!mod.modLogChannelId)}</span></div>
+            <form class="form" data-form="modlog" novalidate>
+              <div class="fields">${field({ name: 'modLogChannelId', label: 'Kanal', id, help: 'Isto možeš postaviti naredbom /modlog u Discordu.',
+                control: selectField({ id, name: 'modLogChannelId', options: [{ value: '', label: 'Bez zapisnika', group: '' }, ...textChannelOptions(g)], value: mod.modLogChannelId || '', placeholder: 'Bez zapisnika', describedBy: `${id}-help` }) })}</div>
+              <div class="form-actions"><button type="submit" class="btn btn-primary">Spremi promjene</button></div>
+            </form>
+          </section>
+          <section class="card area-rest" aria-labelledby="mc-h">
+            <div class="card-head"><div><h2 class="card-title" id="mc-h">Naredbe</h2><p class="card-desc">Moderacija se radi naredbama u Discordu. Vide ih samo članovi s odgovarajućom dozvolom. Argumenti u uglatim zagradama nisu obavezni.</p></div></div>
+            <ul class="plain-list cmd-list two-col">${MOD_COMMANDS.map(([c, a, d]) => html`<li><span class="row-main">
+              <span class="cmd"><span class="mono strong">${c}</span>${a ? html` <span class="mono muted">${a}</span>` : ''}</span>
+              <span class="row-meta" style="display:block">${d}</span></span></li>`)}</ul>
+          </section>
+      </div>`);
+  }
+  const relSpan = (ts) => html`<span data-tip="${fullDate(ts)}">${relTime(ts)}</span>`;
+  function warnCard() {
+    const { mod, open } = state.page;
+    const list = mod.warnings;
+    const total = list.reduce((s, u) => s + u.warnings.length, 0);
+    return html`<div class="card-head"><div><h2 class="card-title" id="wr-h">Upozorenja <span class="count num">${fmtNum(total)}</span></h2>
+        <p class="card-desc">${list.length ? `${count(list.length, 'član ima', 'člana imaju', 'članova ima')} upozorenja. Klikni člana da vidiš svako upozorenje.` : 'Upozorenja daju moderatori naredbom /warn u Discordu.'}</p></div>
+        <div class="card-actions"><button type="button" class="btn-icon" data-action="mod-refresh" aria-label="Osvježi upozorenja" data-tip="Osvježi">${icon('ti-refresh')}</button></div></div>
+      ${list.length
+        ? html`<ul class="plain-list warn-list">${list.map((u) => warnUser(u, open.has(u.user.id)))}</ul>`
+        : emptyState('ti-gavel', 'Nijedan član nema upozorenje. Kad moderator nekoga upozori naredbom /warn, pojavit će se ovdje.')}`;
+  }
+  function warnUser(u, isOpen) {
+    const pid = `wp-${u.user.id}`;
+    const ws = [...u.warnings].sort((a, b) => a.id - b.id);
+    const last = u.warnings.reduce((m, w) => (w.at > m ? w.at : m), 0);
+    return html`<li class="warn-user">
+      <button type="button" class="li-toggle" data-action="warn-toggle" data-id="${u.user.id}" aria-expanded="${String(isOpen)}" aria-controls="${pid}">
+        ${avatar(u.user.avatarUrl, u.user.name)}
+        <span class="row-main"><span class="row-title truncate" style="display:block">${u.user.name}</span>
+          <span class="row-meta num" style="display:block">${count(u.warnings.length, 'upozorenje', 'upozorenja', 'upozorenja')}${last ? html`<span class="sep">·</span>zadnje ${relSpan(last)}` : ''}</span></span>
+        ${icon('ti-chevron-down', 'chev')}
+      </button>
+      <div class="warn-panel" id="${pid}" ${isOpen ? '' : raw('hidden')}>
+        <ol class="warn-items">${ws.map((w) => html`<li>
+          <span class="warn-id num">#${w.id}</span>
+          <span class="row-main"><span class="warn-reason">${w.reason || 'Bez razloga'}</span>
+            <span class="row-meta" style="display:block">${w.by ? w.by.name : 'Nepoznat moderator'}<span class="sep">·</span>${timeEl(w.at)}</span></span>
+          <button type="button" class="btn-icon" data-action="warn-delete" data-user="${u.user.id}" data-id="${w.id}" aria-label="Obriši upozorenje #${w.id} za ${u.user.name}" data-tip="Obriši upozorenje">${icon('ti-trash')}</button>
+        </li>`)}</ol>
+        <div class="warn-foot">${idRow(u.user.id, 'Kopiraj ID korisnika')}<button type="button" class="btn" data-action="warn-clear" data-user="${u.user.id}">Obriši sva upozorenja</button></div>
+      </div>
+    </li>`;
+  }
+  function redrawWarnings(focusUser) {
+    const card = $('#wr-card');
+    if (!card) return;
+    mount(card, warnCard());
+    const t = focusUser && $(`[data-action="warn-toggle"][data-id="${CSS.escape(focusUser)}"]`);
+    if (t) t.focus();
+  }
+  actions['warn-toggle'] = (btn) => {
+    const { open } = state.page;
+    const id = btn.dataset.id;
+    const isOpen = btn.getAttribute('aria-expanded') !== 'true';
+    if (isOpen) open.add(id); else open.delete(id);
+    btn.setAttribute('aria-expanded', String(isOpen));
+    const panel = document.getElementById(btn.getAttribute('aria-controls'));
+    if (panel) panel.hidden = !isOpen;
+  };
+  actions['mod-refresh'] = (btn) => run(btn, async () => {
+    const { g } = state.page;
+    const mod = await api('GET', g$(g.id, '/moderation'));
+    state.page.mod.warnings = mod.warnings || [];
+    redrawWarnings();
+  }, 'Osvježavanje nije uspjelo');
+  const warnEntry = (userId) => state.page.mod.warnings.find((u) => u.user.id === userId);
+  actions['warn-delete'] = (btn) => {
+    const { g } = state.page;
+    const u = warnEntry(btn.dataset.user);
+    const w = u && u.warnings.find((x) => String(x.id) === btn.dataset.id);
+    if (!w) return;
+    confirmAction({
+      title: `Obrisati upozorenje #${w.id} za ${u.user.name}?`,
+      text: `Razlog: „${w.reason || 'bez razloga'}”. Upozorenje se briše trajno i ne može se vratiti.`,
+      confirmLabel: 'Obriši upozorenje',
+      async onConfirm() {
+        await api('DELETE', g$(g.id, `/warnings/${encodeURIComponent(u.user.id)}/${encodeURIComponent(w.id)}`));
+        u.warnings = u.warnings.filter((x) => x !== w);
+        if (!u.warnings.length) state.page.mod.warnings = state.page.mod.warnings.filter((x) => x !== u);
+        redrawWarnings(u.warnings.length ? u.user.id : null);
+        toast('success', `Upozorenje #${w.id} je obrisano`, u.user.name);
+      },
+    });
+  };
+  actions['warn-clear'] = (btn) => {
+    const { g } = state.page;
+    const u = warnEntry(btn.dataset.user);
+    if (!u) return;
+    confirmAction({
+      title: `Obrisati sva upozorenja za ${u.user.name}?`,
+      text: `${u.user.name} gubi ${count(u.warnings.length, 'upozorenje', 'upozorenja', 'upozorenja')}. Ovo se ne može poništiti.`,
+      confirmLabel: 'Obriši upozorenja',
+      async onConfirm() {
+        await api('DELETE', g$(g.id, `/warnings/${encodeURIComponent(u.user.id)}`));
+        state.page.mod.warnings = state.page.mod.warnings.filter((x) => x !== u);
+        state.page.open.delete(u.user.id);
+        redrawWarnings();
+        toast('success', 'Upozorenja su obrisana', u.user.name);
+      },
+    });
+  };
+  forms.modlog = async (f, btn) => {
+    const { g, mod } = state.page;
+    const modLogChannelId = formValue(f, 'modLogChannelId') || null;
+    const ok = await run(btn, () => api('PUT', g$(g.id, '/moderation'), { modLogChannelId }), 'Spremanje nije uspjelo');
+    if (!ok) return;
+    mod.modLogChannelId = modLogChannelId;
+    invalidateGuild(g.id);
+    const b = $('#ml-badge');
+    if (b) mount(b, statusBadge(!!modLogChannelId));
+    toast('success', 'Promjene su spremljene', modLogChannelId ? `Zapisnik moderacije ide u #${channelName(g, modLogChannelId) || ''}.` : 'Zapisnik moderacije je isključen.');
+  };
+
+  // ---------- Games ----------
+  const OTHER_GAMES = [
+    ['Zastave', '/zastava', '[kontinent]', 'Bot pokaže zastavu, a članovi u chatu pogađaju državu. Kontinent nije obavezan.'],
+    ['Wordle', '/wordle', '', 'Pogodi riječ od 5 slova u 6 pokušaja.'],
+    ['Kaladont', '/kaladont', 'start | stop', 'Pokreće ili zaustavlja kaladont u kanalu u kojem upišeš naredbu.'],
+    ['Ship', '/ship', 'korisnik1 [korisnik2]', 'Pokazuje koliko su dvije osobe kompatibilne. Bez drugog korisnika uspoređuje tebe.'],
+  ];
+  async function pageGames(ctx) {
+    ctx.head = pageHead('Igre', 'Igre koje članovi igraju u chatu. Kaladont možeš pokrenuti i zaustaviti odavde.');
+    mount(ctx.el, html`${ctx.head}<div class="areas"><div class="area-main">${skelCard(240)}</div><div class="area-side">${skelCard(420)}</div><div class="area-rest">${skelCard(300)}</div></div>`);
+    const res = await ctx.load(() => Promise.all([guildData(ctx.gid), api('GET', g$(ctx.gid, '/games'))]));
+    if (!res) return;
+    const [g, games] = res;
+    Object.assign(state.page, { g, ctx, kd: games.kaladont || [] });
+    drawGames();
+  }
+  function drawGames() {
+    const { g, ctx, kd } = state.page;
+    const id = uid('f');
+    const active = new Set(kd.map((k) => k.channelId));
+    const opts = textChannelOptions(g).map((o) => (active.has(o.value) ? { ...o, disabled: true, desc: 'Kaladont već traje' } : o));
+    mount(ctx.el, html`${ctx.head}
+      <div class="areas">
+        <section class="card area-main" aria-labelledby="kd-h" id="kd-card">${kdCard()}</section>
+        <section class="card area-side" aria-labelledby="kds-h">
+          <div class="card-head"><div><h2 class="card-title" id="kds-h">Pokreni kaladont</h2><p class="card-desc">Bot objavi prvu riječ, a članovi nastavljaju u kanalu.</p></div></div>
+          <form class="form" data-form="kd-start" novalidate>
+            <div class="fields">${field({ name: 'channelId', label: 'Kanal', id, required: true,
+              control: selectField({ id, name: 'channelId', options: opts, placeholder: 'Odaberi kanal', emptyText: 'Server nema tekstualnih kanala.' }) })}</div>
+            <div class="form-actions phone-full"><button type="submit" class="btn btn-primary">${icon('ti-player-play')}Pokreni kaladont</button></div>
+          </form>
+          <h3 class="sub-title section-gap">Pravila</h3>
+          <ul class="bullets">
+            <li>Svaka riječ počinje s posljednja dva slova prethodne.</li>
+            <li>Isti igrač ne smije igrati dvaput zaredom, a riječ se u igri smije pojaviti samo jednom.</li>
+            <li>Pobjeđuje tko napiše riječ na -nt, npr. kaladont, ili riječ koju nitko ne može nastaviti.</li>
+          </ul>
+        </section>
+        <section class="card area-rest" aria-labelledby="og-h">
+          <div class="card-head"><div><h2 class="card-title" id="og-h">Ostale igre</h2><p class="card-desc">Pokreću se naredbom u Discordu, u kanalu u kojem se igra.</p></div></div>
+          <ul class="plain-list">${OTHER_GAMES.map(([n, c, a, d]) => html`<li><span class="row-main">
+            <span class="row-title" style="display:block">${n}</span>
+            <span class="row-meta" style="display:block">${d}</span>
+            <span class="cmd" style="display:block;margin-top:4px"><span class="mono strong">${c}</span>${a ? html` <span class="mono muted">${a}</span>` : ''}</span></span></li>`)}</ul>
+        </section>
+      </div>`);
+  }
+  function kdCard() {
+    const { kd } = state.page;
+    return html`<div class="card-head"><div><h2 class="card-title" id="kd-h">Kaladont <span class="count num">${fmtNum(kd.length)}</span></h2>
+        <p class="card-desc">${kd.length ? 'Kanali u kojima se trenutno igra.' : 'Igra riječi u kojoj svaka riječ počinje krajem prethodne.'}</p></div>
+        <div class="card-actions"><button type="button" class="btn-icon" data-action="kd-refresh" aria-label="Osvježi igre" data-tip="Osvježi">${icon('ti-refresh')}</button></div></div>
+      ${kd.length
+        ? html`<ul class="plain-list">${kd.map((k) => html`<li class="row-wrap no-lead" style="flex-wrap:wrap">
+            <span class="row-main"><span class="row-title" style="display:block">#${k.channelName}</span>
+              <span class="row-meta num" style="display:block">Zadnja riječ <span class="strong">${k.lastWord}</span><span class="sep">·</span>iduća počinje s <span class="strong">${String(k.lastWord || '').slice(-2)}</span></span>
+              <span class="row-meta num" style="display:block">${k.streak ? html`${count(k.streak, 'potez', 'poteza', 'poteza')} zaredom${k.lastUser ? html`<span class="sep">·</span>zadnji potez: ${k.lastUser.name}` : ''}` : 'Igra je tek počela, još nitko nije igrao'}</span></span>
+            <span class="row-end"><button type="button" class="btn" data-action="kd-stop" data-id="${k.channelId}">${icon('ti-player-stop')}Zaustavi</button></span>
+          </li>`)}</ul>`
+        : emptyState('ti-device-gamepad-2', 'Kaladont se trenutno ne igra ni u jednom kanalu. Pokreni ga ovdje ili naredbom /kaladont start.')}`;
+  }
+  async function reloadGames() {
+    const { g } = state.page;
+    const res = await api('GET', g$(g.id, '/games'));
+    state.page.kd = res.kaladont || [];
+    invalidateGuild(g.id);
+  }
+  actions['kd-refresh'] = (btn) => run(btn, async () => {
+    await reloadGames();
+    drawGames();
+  }, 'Osvježavanje nije uspjelo');
+  forms['kd-start'] = async (f, btn) => {
+    clearErrors(f);
+    const { g } = state.page;
+    const channelId = formValue(f, 'channelId');
+    if (!channelId) return fieldError(f, 'channelId', 'Odaberi kanal u kojem se igra kaladont.');
+    const ok = await run(btn, async () => {
+      await api('POST', g$(g.id, '/games/kaladont'), { channelId });
+      await reloadGames();
+    }, 'Kaladont nije pokrenut');
+    if (!ok) return;
+    drawGames();
+    const k = state.page.kd.find((x) => x.channelId === channelId);
+    toast('success', 'Kaladont je pokrenut', `U #${channelName(g, channelId) || ''}${k && k.lastWord ? `, prva riječ je ${k.lastWord}` : ''}.`);
+  };
+  actions['kd-stop'] = (btn) => {
+    const { g } = state.page;
+    const k = state.page.kd.find((x) => x.channelId === btn.dataset.id);
+    if (!k) return;
+    confirmAction({
+      title: `Zaustaviti kaladont u #${k.channelName}?`,
+      text: `Igra se prekida nakon ${count(k.streak || 0, 'poteza', 'poteza', 'poteza')} i ne može se nastaviti. Novu igru možeš pokrenuti kad god želiš.`,
+      confirmLabel: 'Zaustavi kaladont',
+      async onConfirm() {
+        await api('DELETE', g$(g.id, `/games/kaladont/${encodeURIComponent(k.channelId)}`));
+        state.page.kd = state.page.kd.filter((x) => x !== k);
+        invalidateGuild(g.id);
+        drawGames();
+        toast('success', 'Kaladont je zaustavljen', `#${k.channelName}`);
+      },
+    });
+  };
+
   // ---------- Appearance (accent picker) ----------
   actions.appearance = () => {
     closeDrawer(false);
@@ -2535,6 +3110,9 @@
     reactionroles: pageReactionRoles,
     giveaways: pageGiveaways,
     music: pageMusic,
+    antinuke: pageAntinuke,
+    moderation: pageModeration,
+    games: pageGames,
   };
 
   /* =====================================================================
