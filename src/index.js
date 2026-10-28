@@ -10,7 +10,8 @@ import { scheduleStatsUpdate } from './features/stats.js';
 import * as tickets from './features/tickets.js';
 import { fail } from './utils/helpers.js';
 
-const BOT_NAME = 'NPC Utils';
+const BOT_NAME = 'Jaankeza Utils';
+const STATUS = 'discord.gg/jaankeza';
 
 try {
   process.loadEnvFile();
@@ -39,7 +40,7 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.User, Partials.GuildMember],
   presence: {
     status: 'online',
-    activities: [{ name: '/help • NPC Utils', type: ActivityType.Watching }],
+    activities: [{ name: STATUS, state: STATUS, type: ActivityType.Custom }],
   },
 });
 

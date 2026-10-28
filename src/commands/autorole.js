@@ -42,7 +42,7 @@ export async function execute(interaction) {
     let given = 0;
     for (const member of members.values()) {
       if (member.user.bot || member.roles.cache.has(role.id)) continue;
-      await member.roles.add(role, 'NPC Utils autorole').then(() => given++, () => {});
+      await member.roles.add(role, 'Jaankeza Utils autorole').then(() => given++, () => {});
     }
     return reply(interaction, `✅ ${role} dana za **${given}** postojećih članova.`);
   }

@@ -1,10 +1,10 @@
-# 🤖 NPC Utils
+# 🤖 Jaankeza Utils
 
 Custom Discord bot napravljen u [discord.js](https://discord.js.org) v14.
 
 | Feature | Što radi |
 | --- | --- |
-| 🟢 **Uvijek aktivan** | Auto-reconnect, ne pada na greškama, Docker / pm2 restart, keep-alive HTTP endpoint |
+| 🟢 **Uvijek aktivan** | Status `discord.gg/jaankeza`, auto-reconnect, ne pada na greškama, Docker / pm2 restart, keep-alive HTTP endpoint |
 | 📊 **Stats kanali** | Kanali na vrhu servera: `👥 Članovi`, `🤖 Botovi`, `🚀 Boostovi` — ažuriraju se sami |
 | 🎫 **Tiketi** | Panel s gumbom → privatni kanal → zatvaranje s transkriptom u log kanal |
 | 📨 **Invite counter** | Prati tko je koga pozvao (pravi / izašli / lažni / bonus), leaderboard |
@@ -18,7 +18,7 @@ Custom Discord bot napravljen u [discord.js](https://discord.js.org) v14.
 
 ## 1. Napravi bota na Discordu
 
-1. Idi na <https://discord.com/developers/applications> → **New Application** → ime: **NPC Utils**.
+1. Idi na <https://discord.com/developers/applications> → **New Application** → ime: **Jaankeza Utils**.
 2. **Bot** tab:
    - **Reset Token** → kopiraj token (treba za `.env`).
    - Uključi **Privileged Gateway Intents**:
@@ -30,7 +30,7 @@ Custom Discord bot napravljen u [discord.js](https://discord.js.org) v14.
    https://discord.com/oauth2/authorize?client_id=CLIENT_ID&permissions=8&scope=bot%20applications.commands
    ```
 
-4. ⚠️ U **Server Settings → Roles** pomakni rolu **NPC Utils** **iznad** svih rola koje bot treba davati (Member, reaction role…). Bot ne može dati rolu koja je iznad njegove.
+4. ⚠️ U **Server Settings → Roles** pomakni rolu **Jaankeza Utils** **iznad** svih rola koje bot treba davati (Member, reaction role…). Bot ne može dati rolu koja je iznad njegove.
 
 ## 2. Pokretanje
 
@@ -50,7 +50,7 @@ U `.env` upiši `DISCORD_TOKEN=...` (i po želji `GUILD_ID=` ID svog servera —
 npm start
 ```
 
-Kad u konzoli piše `✅ NPC Utils#xxxx je online`, bot radi. Sve postavke spremaju se u `data/db.json`.
+Kad u konzoli piše `✅ Jaankeza Utils#xxxx je online`, bot radi. Sve postavke spremaju se u `data/db.json`.
 
 ## 3. Da bude uvijek aktivan (24/7)
 

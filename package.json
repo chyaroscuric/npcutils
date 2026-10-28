@@ -1,7 +1,7 @@
 {
-  "name": "npc-utils",
+  "name": "jaankeza-utils",
   "version": "1.0.0",
-  "description": "NPC Utils - Discord bot (stats kanali, tiketi, invite counter, autorole, welcome/boost poruke, reaction roles, giveaway)",
+  "description": "Jaankeza Utils - Discord bot (stats kanali, tiketi, invite counter, autorole, welcome/boost poruke, reaction roles, giveaway)",
   "type": "module",
   "main": "src/index.js",
   "scripts": {

@@ -57,7 +57,7 @@ export async function updateStats(guild) {
         continue;
       }
       lastRename.set(channel.id, Date.now());
-      await channel.setName(name, 'NPC Utils statistika');
+      await channel.setName(name, 'Jaankeza Utils statistika');
     }
   } finally {
     running.delete(guild.id);
@@ -105,7 +105,7 @@ export async function removeStats(guild) {
   if (!cfg) return false;
   for (const id of [...Object.keys(STATS).map((k) => cfg[k]), cfg.categoryId]) {
     const channel = id && guild.channels.cache.get(id);
-    if (channel) await channel.delete('NPC Utils statistika uklonjena').catch(() => {});
+    if (channel) await channel.delete('Jaankeza Utils statistika uklonjena').catch(() => {});
   }
   delete g.config.stats;
   db.save();

@@ -13,7 +13,7 @@ export async function giveAutoroles(member) {
   const roles = (g.config.autoroles ?? [])
     .map((id) => member.guild.roles.cache.get(id))
     .filter((role) => role && !roleProblem(member.guild, role));
-  if (roles.length) await member.roles.add(roles, 'NPC Utils autorole');
+  if (roles.length) await member.roles.add(roles, 'Jaankeza Utils autorole');
 }
 
 export function welcomePayload(member, inviterId) {

@@ -46,12 +46,12 @@ async function resolve(reaction, user) {
 
 export async function onReactionAdd(reaction, user) {
   const r = await resolve(reaction, user);
-  if (r && !r.member.roles.cache.has(r.role.id)) await r.member.roles.add(r.role, 'NPC Utils reaction role');
+  if (r && !r.member.roles.cache.has(r.role.id)) await r.member.roles.add(r.role, 'Jaankeza Utils reaction role');
 }
 
 export async function onReactionRemove(reaction, user) {
   const r = await resolve(reaction, user);
-  if (r && r.member.roles.cache.has(r.role.id)) await r.member.roles.remove(r.role, 'NPC Utils reaction role');
+  if (r && r.member.roles.cache.has(r.role.id)) await r.member.roles.remove(r.role, 'Jaankeza Utils reaction role');
 }
 
 export function onMessageDelete(message) {

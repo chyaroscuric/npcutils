@@ -35,7 +35,7 @@ export function giveawayPayload(gw) {
   const embed = new EmbedBuilder()
     .setTitle(`🎉 ${gw.prize}`)
     .setColor(gw.ended ? COLOR_ENDED : COLOR_ACTIVE)
-    .setFooter({ text: `${gw.winners} ${gw.winners === 1 ? 'pobjednik' : 'pobjednika'} • NPC Utils Giveaway` })
+    .setFooter({ text: `${gw.winners} ${gw.winners === 1 ? 'pobjednik' : 'pobjednika'} • Jaankeza Utils Giveaway` })
     .setTimestamp(gw.endsAt);
   const lines = [];
   if (gw.description) lines.push(gw.description, '');

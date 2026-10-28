@@ -2,7 +2,7 @@
 module.exports = {
   apps: [
     {
-      name: 'npc-utils',
+      name: 'jaankeza-utils',
       script: 'src/index.js',
       autorestart: true,
       restart_delay: 5000,
