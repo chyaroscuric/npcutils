@@ -138,7 +138,7 @@ Brzina: bot odmah dobije direktan link na zvuk, ne rekodira YouTubeov Opus i una
 | Anti mention (@everyone/@here) | 0 |
 | Anti bot add, prune, opasne permisije na roli, dodavanje opasne role | kazna odmah |
 
-Limit znači koliko puta netko smije napraviti akciju u vremenskom prozoru (zadano 60 s); kad ga prijeđe, kažnjen je. Uključi s `/antinuke ukljuci ukljuceno:True`, podesi s `/antinuke pravilo`, `/antinuke postavke` i `/antinuke whitelist`, ili na stranici **Anti-nuke** u dashboardu.
+Limit znači nakon koliko akcija u vremenskom prozoru (zadano 60 s) slijedi kazna: limit 1 = kazna već kod prve akcije, limit 3 = kod treće. Moderatore koji smiju normalno banati/kickati stavi na whitelist. Uključi s `/antinuke ukljuci ukljuceno:True`, podesi s `/antinuke pravilo`, `/antinuke postavke` i `/antinuke whitelist`, ili na stranici **Anti-nuke** u dashboardu.
 
 - Postavke može mijenjati **samo vlasnik servera**. Vlasnik i sam bot su uvijek izuzeti.
 - Rola bota mora biti **na vrhu** popisa rola, inače ne može kazniti nekoga s višom rolom.

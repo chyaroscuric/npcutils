@@ -23,6 +23,8 @@ export const RULES = {
   dangerousRoleAdd: { label: 'Anti dangerous role add', limited: false },
 };
 
+export const limitText = (limit) => (limit <= 1 ? 'kazna već kod 1. akcije' : `kazna kod ${limit}. akcije`);
+
 export const PUNISHMENTS = {
   ban: 'Ban',
   kick: 'Kick',
@@ -152,7 +154,8 @@ async function isExempt(guild, userId) {
   return Boolean(member?.roles.cache.some((r) => cfg.whitelistRoles.includes(r.id)));
 }
 
-// Records an action and punishes when the limit is exceeded (or right away for instant rules).
+// Records an action and punishes once it happened `limit` times within the window (limit 0 or 1 = the first time),
+// or right away for instant rules.
 async function track(guild, action, executorId, targetId, extra = {}) {
   const cfg = getConfig(guild.id);
   const rule = cfg.rules[action];
@@ -165,7 +168,9 @@ async function track(guild, action, executorId, targetId, extra = {}) {
   const recent = [...actions.filter((a) => now - a.at < cfg.windowSec * 1000), { at: now, targetId, extra }];
   history.set(key, { ...history.get(key), [action]: recent });
 
-  if (RULES[action].limited && recent.length <= rule.limit) return false;
+  // visible in the console, so it is easy to check that the bot sees the audit log
+  console.log(`[antinuke] ${guild.name}: ${action} od ${executorId} (${recent.length}/${RULES[action].limited ? Math.max(1, rule.limit) : 1})`);
+  if (RULES[action].limited && recent.length < Math.max(1, rule.limit)) return false;
   const alreadyPunished = (punishedUntil.get(key) ?? 0) > now;
   punishedUntil.set(key, now + cfg.windowSec * 1000);
   // a nuker keeps going while being banned; undo the new damage but punish only once

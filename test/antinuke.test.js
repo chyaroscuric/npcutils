@@ -38,8 +38,15 @@ test('config is validated and merged with defaults', () => {
   assert.equal(cfg.rules.kick.limit, 1);
 });
 
-test('mass ban gets punished once and reverted', async () => {
+test('limit 1 punishes the first ban', async () => {
   antinuke.saveConfig('g1', { enabled: true, windowSec: 60, revert: true, rules: { ban: { limit: 1, punishment: 'ban' } } });
+  const { guild, calls } = fakeGuild();
+  await antinuke.onAuditLogEntry({ action: AuditLogEvent.MemberBanAdd, executorId: 'mod', targetId: 'v0', changes: [] }, guild);
+  assert.deepEqual(calls.filter((c) => c[0] !== 'dm-owner'), [['ban', 'mod'], ['unban', 'v0']]);
+});
+
+test('mass ban gets punished once and reverted', async () => {
+  antinuke.saveConfig('g1', { enabled: true, windowSec: 60, revert: true, rules: { ban: { limit: 2, punishment: 'ban' } } });
   const { guild, calls } = fakeGuild();
   const ban = (target, executorId = 'nuker') => antinuke.onAuditLogEntry({ action: AuditLogEvent.MemberBanAdd, executorId, targetId: target, changes: [] }, guild);
   await ban('v1');

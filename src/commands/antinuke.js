@@ -1,5 +1,5 @@
 import { ChannelType, EmbedBuilder, InteractionContextType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
-import { PUNISHMENTS, RULES, canConfigure, getConfig, saveConfig } from '../features/antinuke.js';
+import { PUNISHMENTS, RULES, canConfigure, getConfig, limitText, saveConfig } from '../features/antinuke.js';
 import { UserError, reply } from '../utils/helpers.js';
 
 export const deferEphemeral = true;
@@ -25,7 +25,7 @@ export const data = new SlashCommandBuilder()
       .setDescription('Podesi jedno pravilo (limit i kaznu)')
       .addStringOption((o) => o.setName('akcija').setDescription('Pravilo').setRequired(true).addChoices(...ruleChoices))
       .addBooleanOption((o) => o.setName('ukljuceno').setDescription('Je li pravilo uključeno'))
-      .addIntegerOption((o) => o.setName('limit').setDescription('Koliko puta smije u vremenskom prozoru (0 = nijednom)').setMinValue(0).setMaxValue(50))
+      .addIntegerOption((o) => o.setName('limit').setDescription('Nakon koliko akcija u vremenskom prozoru slijedi kazna (1 = već prva)').setMinValue(0).setMaxValue(50))
       .addStringOption((o) => o.setName('kazna').setDescription('Kazna').addChoices(...punishmentChoices)),
   )
   .addSubcommand((s) =>
@@ -59,7 +59,7 @@ export const data = new SlashCommandBuilder()
 function statusEmbed(guild, cfg) {
   const rules = Object.entries(RULES).map(([key, r]) => {
     const rule = cfg.rules[key];
-    const limit = r.limited ? `limit ${rule.limit}` : 'odmah';
+    const limit = r.limited ? `limit ${rule.limit} (${limitText(rule.limit)})` : 'odmah';
     return `${rule.enabled ? '✅' : '⬛'} **${r.label}** — ${limit}, kazna: ${PUNISHMENTS[rule.punishment]}`;
   });
   const whitelist = [...cfg.whitelistUsers.map((id) => `<@${id}>`), ...cfg.whitelistRoles.map((id) => `<@&${id}>`)];
