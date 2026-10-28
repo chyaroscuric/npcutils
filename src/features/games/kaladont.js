@@ -6,7 +6,7 @@ import { WORDS } from '../../data/words.js';
 import { UserError } from '../../utils/helpers.js';
 import { countStartingWith, isWord, ready } from './dictionary.js';
 import { hasRound } from './flags.js';
-import { WORD_RE, clean, pick } from './text.js';
+import { WORD_RE, clean, normalize, pick } from './text.js';
 
 const COLOR_GAME = 0x5865f2;
 const COLOR_ERROR = 0xf0883e;
@@ -39,10 +39,11 @@ function startWord() {
 export function checkMove(game, userId, word) {
   if (game.lastUserId === userId) return { title: '⛔ Nije tvoj red!', text: 'Moraš pričekati da netko drugi upiše riječ.' };
   if (word.length < MIN_LENGTH) return { title: '⛔ Prekratko', text: `Riječ mora imati barem ${MIN_LENGTH} slova.` };
-  if (!word.startsWith(required(game.lastWord))) {
+  // letters are compared without diacritics: c = č = ć, s = š, z = ž, d = đ
+  if (!normalize(word).startsWith(normalize(required(game.lastWord)))) {
     return { title: '⛔ Krivi početak', text: `Riječ mora počinjati s **${required(game.lastWord)}**.` };
   }
-  if (game.used.includes(word)) return { title: '⛔ Već iskorišteno', text: `Riječ **${word}** je već bila u ovoj igri.` };
+  if (game.used.some((used) => normalize(used) === normalize(word))) return { title: '⛔ Već iskorišteno', text: `Riječ **${word}** je već bila u ovoj igri.` };
   if (!isWord(word)) return { title: '⛔ Ne poznajem tu riječ', text: `**${word}** nije u mom rječniku.` };
   return null;
 }

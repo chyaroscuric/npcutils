@@ -18,7 +18,9 @@ const lastCountry = new Map(); // channelId -> iso2, so the same flag does not c
 export const continentLabel = (key) => CONTINENTS[key] ?? 'Svi kontinenti';
 
 export function acceptedAnswers(country) {
-  return new Set([country.hr, country.en, ...country.aliases].map(normalize));
+  const names = [country.hr, country.en, ...country.aliases];
+  // normalize() already ignores č/ć/š/ž/đ; people also write đ as "dj"
+  return new Set([...names, ...names.map((n) => n.replace(/đ/gi, 'dj'))].map(normalize));
 }
 
 export function isCorrect(country, text) {

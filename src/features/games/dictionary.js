@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { dataDir } from '../../db.js';
 import { WORDS } from '../../data/words.js';
-import { WORD_RE, clean } from './text.js';
+import { WORD_RE, clean, normalize } from './text.js';
 
 const SOURCES = {
   'hr.dic': 'https://raw.githubusercontent.com/wooorm/dictionaries/main/dictionaries/hr/index.dic',
@@ -22,7 +22,8 @@ export const EXTRA_WORDS = [
 ];
 
 let words = null; // Set once loaded
-let prefixCounts = null; // two-letter prefix -> number of words
+let folded = null; // words without diacritics, so "kuca" is accepted for "kuća" and "djak" for "đak"
+let prefixCounts = null; // two-letter prefix (without diacritics) -> number of words
 let failed = false;
 let loading = null;
 
@@ -75,10 +76,14 @@ async function load() {
 export function useWords(set) {
   words = set;
   failed = false;
+  folded = new Set();
   prefixCounts = new Map();
   for (const w of set) {
-    const p = w.slice(0, 2);
-    prefixCounts.set(p, (prefixCounts.get(p) ?? 0) + 1);
+    for (const variant of w.includes('đ') ? [w, w.replace(/đ/g, 'dj')] : [w]) {
+      const f = normalize(variant);
+      folded.add(f);
+      prefixCounts.set(f.slice(0, 2), (prefixCounts.get(f.slice(0, 2)) ?? 0) + 1);
+    }
   }
 }
 
@@ -99,15 +104,15 @@ export function isWord(word) {
     if (!failed) ready();
     return true;
   }
-  return words.has(clean(word));
+  return words.has(clean(word)) || folded.has(normalize(word));
 }
 
 // How many dictionary words start with the given letters (Infinity when unknown).
 export function countStartingWith(prefix) {
   if (!prefixCounts) return Infinity;
-  const p = clean(prefix);
+  const p = normalize(prefix);
   if (p.length === 2) return prefixCounts.get(p) ?? 0;
   let n = 0;
-  for (const w of words) if (w.startsWith(p)) n++;
+  for (const w of folded) if (w.startsWith(p)) n++;
   return n;
 }

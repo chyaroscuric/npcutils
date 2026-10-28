@@ -11,7 +11,7 @@ import {
 import { WORDS } from '../../data/words.js';
 import { UserError, fail } from '../../utils/helpers.js';
 import { isWord, ready } from './dictionary.js';
-import { WORD_RE, clean, letters, pick, upper } from './text.js';
+import { WORD_RE, clean, letters, normalize, pick, upper } from './text.js';
 
 const LENGTH = 5;
 const TRIES = 6;
@@ -20,9 +20,10 @@ const SQUARE = { correct: '🟩', present: '🟨', absent: '⬛' };
 const games = new Map(); // `${guildId}:${userId}` -> game
 
 // Standard Wordle colouring, including repeated letters (each letter of the answer is "used" once).
+// Letters are compared without diacritics, so typing "c" counts for "č"/"ć" (s = š, z = ž, d = đ).
 export function score(guess, answer) {
-  const g = letters(guess);
-  const a = letters(answer);
+  const g = letters(guess).map(normalize);
+  const a = letters(answer).map(normalize);
   const result = Array(g.length).fill('absent');
   const left = new Map();
   g.forEach((ch, i) => {
@@ -46,7 +47,7 @@ function payload(game, user) {
   const absent = new Set();
   const found = new Set();
   for (const { word, result } of game.guesses) {
-    letters(word).forEach((ch, i) => (result[i] === 'absent' ? absent : found).add(ch));
+    letters(word).forEach((ch, i) => (result[i] === 'absent' ? absent : found).add(normalize(ch)));
   }
   for (const ch of found) absent.delete(ch);
 
@@ -93,7 +94,7 @@ export async function startGame(interaction) {
 export function validateGuess(guess) {
   if (letters(guess).length !== LENGTH) return `Riječ mora imati točno ${LENGTH} slova.`;
   if (!WORD_RE.test(guess)) return 'Koristi samo slova (č, ć, đ, š, ž su dopuštena).';
-  if (!WORDS.includes(guess) && !isWord(guess)) return `Ne poznajem riječ **${guess.toUpperCase()}**.`;
+  if (!WORDS.some((w) => normalize(w) === normalize(guess)) && !isWord(guess)) return `Ne poznajem riječ **${guess.toUpperCase()}**.`;
   return null;
 }
 
@@ -129,7 +130,7 @@ export async function handleComponent(interaction) {
     const problem = validateGuess(guess);
     if (problem) return fail(interaction, problem);
     game.guesses.push({ word: guess, result: score(guess, game.answer) });
-    if (guess === game.answer) game.status = 'won';
+    if (normalize(guess) === normalize(game.answer)) game.status = 'won';
     else if (game.guesses.length >= TRIES) game.status = 'lost';
     return interaction.update(payload(game, interaction.user));
   }

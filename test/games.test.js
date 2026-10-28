@@ -10,7 +10,7 @@ const { WORDS } = await import('../src/data/words.js');
 const { isCorrect } = await import('../src/features/games/flags.js');
 const { score, validateGuess } = await import('../src/features/games/wordle.js');
 const { checkMove } = await import('../src/features/games/kaladont.js');
-const { useWords } = await import('../src/features/games/dictionary.js');
+const { isWord, useWords } = await import('../src/features/games/dictionary.js');
 const { shipPercent, shipName } = await import('../src/features/games/ship.js');
 
 test('country data is complete', () => {
@@ -61,4 +61,20 @@ test('ship is deterministic', () => {
   assert.equal(shipPercent('1', '2'), shipPercent('2', '1'));
   assert.ok(shipPercent('1', '2') >= 0 && shipPercent('1', '2') <= 100);
   assert.equal(shipName('Ana', 'Marko'), 'Anrko');
+});
+
+test('letters without diacritics count as the same letter', () => {
+  const find = (iso) => COUNTRIES.find((c) => c.iso2 === iso);
+  assert.ok(isCorrect(find('dj'), 'dzibuti'));
+  assert.ok(isCorrect(find('cz'), 'ceska republika'));
+  assert.deepEqual(score('cekic', 'čekić'), ['correct', 'correct', 'correct', 'correct', 'correct']);
+  assert.deepEqual(score('kuca', 'kuća'), ['correct', 'correct', 'correct', 'correct']);
+
+  useWords(new Set(['kuća', 'ćevap', 'đak', 'čaša']));
+  const game = { lastWord: 'kuća', lastUserId: '1', used: ['kuća'], streak: 1 };
+  assert.equal(checkMove(game, '2', 'casa'), null); // "ća" -> "ca", čaša typed without diacritics
+  assert.equal(checkMove({ ...game, lastWord: 'kuca', used: ['kuca'] }, '2', 'čaša'), null);
+  assert.match(checkMove({ ...game, used: ['kuća', 'čaša'] }, '2', 'casa').title, /Već iskorišteno/);
+  assert.ok(isWord('djak') && isWord('dak') && isWord('cevap'));
+  assert.ok(!isWord('kuka'));
 });
