@@ -131,7 +131,7 @@ export function startDashboard(client, port) {
     const session = sid && sessions.get(sid);
     if (!session || session.expires < Date.now()) {
       if (sid) sessions.delete(sid);
-      return res.status(401).json({ error: 'Nisi prijavljen/a.' });
+      return res.status(401).json({ error: 'Nisi prijavljen/a.', bot: { name: client.user?.username, avatarUrl: avatarOf(client.user) } });
     }
     if (req.method !== 'GET' && req.get('X-Dashboard') !== '1') return res.status(403).json({ error: 'Neispravan zahtjev.' });
     req.userId = session.userId;

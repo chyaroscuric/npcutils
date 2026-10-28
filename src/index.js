@@ -87,6 +87,7 @@ client.once(Events.ClientReady, async () => {
 
   for (const guild of client.guilds.cache.values()) await prepareGuild(guild);
   giveaways.start(client);
+  music.checkSetup();
 
   // safety net in case some event was missed
   setInterval(() => client.guilds.cache.forEach((guild) => scheduleStatsUpdate(guild)), 10 * 60 * 1000);

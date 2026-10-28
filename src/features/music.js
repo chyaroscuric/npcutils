@@ -1,7 +1,9 @@
 // Music player: yt-dlp finds/streams the audio, ffmpeg turns it into Ogg Opus, @discordjs/voice plays it.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import {
   AudioPlayerStatus,
   NoSubscriberBehavior,
@@ -10,6 +12,7 @@ import {
   createAudioPlayer,
   createAudioResource,
   entersState,
+  generateDependencyReport,
   joinVoiceChannel,
 } from '@discordjs/voice';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
@@ -18,8 +21,10 @@ import { dataDir } from '../db.js';
 import { UserError, fail } from '../utils/helpers.js';
 import { logActivity } from './activity.js';
 
-const FFMPEG = process.env.FFMPEG_PATH || ffmpegStatic || 'ffmpeg';
-let YTDLP = process.env.YTDLP_PATH || null;
+let FFMPEG = null;
+let ffmpegPromise = null;
+let YTDLP = null;
+let YTDLP_EXTRA_ARGS = [];
 let ytdlpPromise = null;
 const MAX_PLAYLIST = 100;
 const MAX_QUEUE = 500;
@@ -31,26 +36,130 @@ const queues = new Map(); // guildId -> GuildQueue
 
 export const LOOP_LABELS = { off: 'isključeno', track: 'pjesma', queue: 'red' };
 
+// yt-dlp release binaries unpack themselves (~100 MB) into TMPDIR on every run. /tmp on hosting
+// panels is often a small tmpfs, so use a folder next to the database instead.
+let tmpReady = false;
+function childEnv() {
+  const tmp = path.join(dataDir(), 'tmp');
+  if (!tmpReady) {
+    fs.mkdirSync(tmp, { recursive: true });
+    // leftovers of yt-dlp processes that were killed (skip/stop/restart)
+    for (const name of fs.readdirSync(tmp)) {
+      if (name.startsWith('_MEI')) fs.rmSync(path.join(tmp, name), { recursive: true, force: true });
+    }
+    tmpReady = true;
+  }
+  return { ...process.env, TMPDIR: tmp, TEMP: tmp, TMP: tmp };
+}
+
+// SIGTERM lets yt-dlp's launcher delete what it unpacked; SIGKILL only if it does not exit.
+function stopProcess(child) {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  child.kill('SIGTERM');
+  setTimeout(() => child.exitCode === null && child.signalCode === null && child.kill('SIGKILL'), 5000).unref();
+}
+
 function run(bin, args, timeout = 30_000) {
   return new Promise((resolve, reject) => {
-    const child = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'], env: childEnv() });
     let out = '';
     let err = '';
-    const timer = setTimeout(() => child.kill('SIGKILL'), timeout);
+    const timer = setTimeout(() => stopProcess(child), timeout);
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (err += d));
-    child.on('error', (e) =>
-      reject(e.code === 'ENOENT' ? new UserError(`Na serveru nije instaliran \`${bin}\` (potreban za glazbu).`) : e),
-    );
+    child.on('error', (e) => {
+      clearTimeout(timer);
+      reject(e.code === 'ENOENT' ? new Error(`${bin} ne postoji`) : e);
+    });
     child.on('close', (code) => {
       clearTimeout(timer);
       if (code === 0) resolve(out);
-      else reject(new Error(err.trim().split('\n').pop() || `${bin} exited with ${code}`));
+      else reject(new Error(lastErrorLine(err) || `${path.basename(bin)} exited with ${code}`));
     });
   });
 }
 
-const YTDLP_RELEASES = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/';
+const lastErrorLine = (stderr) =>
+  stderr
+    .trim()
+    .split('\n')
+    .filter((l) => !l.startsWith('WARNING'))
+    .pop() ?? '';
+
+// Turns a yt-dlp error into something the user can act on.
+function explainYtdlpError(message) {
+  if (/confirm you.re not a bot|Sign in to confirm/i.test(message)) {
+    return 'YouTube blokira IP adresu hostinga ("potvrdi da nisi bot"). Probaj SoundCloud link ili pokreni bota na drugom serveru.';
+  }
+  if (/private video|video (is )?unavailable|not available/i.test(message)) return 'Taj video nije dostupan (privatan, obrisan ili blokiran).';
+  if (/age/i.test(message) && /restrict|confirm your age/i.test(message)) return 'Video je dobno ograničen i ne mogu ga pustiti.';
+  if (/Unsupported URL/i.test(message)) return 'Taj link nije podržan.';
+  return null;
+}
+
+const binDir = () => path.join(dataDir(), 'bin');
+const EXE = process.platform === 'win32' ? '.exe' : '';
+
+async function download(url, file, { gunzip = false } = {}) {
+  console.log(`[music] Preuzimam ${path.basename(file)}...`);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`download ${res.status} (${url})`);
+  let data = Buffer.from(await res.arrayBuffer());
+  if (gunzip) data = zlib.gunzipSync(data);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(`${file}.tmp`, data, { mode: 0o755 });
+  fs.renameSync(`${file}.tmp`, file);
+}
+
+// Tries candidate binaries in order and keeps the first one that runs.
+async function firstWorking(name, candidates, versionArgs, parseVersion) {
+  for (const candidate of candidates) {
+    try {
+      const bin = typeof candidate === 'function' ? await candidate() : candidate;
+      if (!bin) continue;
+      const version = parseVersion((await run(bin, versionArgs, 120_000)).trim());
+      return { bin, version };
+    } catch (err) {
+      console.warn(`[music] ${name}: ${err.message}`);
+    }
+  }
+  throw new UserError(`${name} ne radi na ovom serveru, pa glazba ne može raditi (pogledaj konzolu bota).`);
+}
+
+// ffmpeg: FFMPEG_PATH, ffmpeg-static (if its install script managed to download it), our own copy
+// in data/bin (downloaded from the same place ffmpeg-static uses), or a system ffmpeg.
+export function ensureFfmpeg() {
+  ffmpegPromise ??= firstWorking(
+    'ffmpeg',
+    [
+      process.env.FFMPEG_PATH,
+      ffmpegStatic && fs.existsSync(ffmpegStatic) ? ffmpegStatic : null,
+      async () => {
+        const file = path.join(binDir(), `ffmpeg${EXE}`);
+        if (!fs.existsSync(file)) {
+          const pkg = JSON.parse(fs.readFileSync(createRequire(import.meta.url).resolve('ffmpeg-static/package.json')));
+          const release = pkg['ffmpeg-static']['binary-release-tag'];
+          await download(
+            `https://github.com/eugeneware/ffmpeg-static/releases/download/${release}/ffmpeg-${process.platform}-${process.arch}.gz`,
+            file,
+            { gunzip: true },
+          );
+        }
+        return file;
+      },
+      'ffmpeg',
+    ],
+    ['-hide_banner', '-version'],
+    (out) => out.split('\n')[0].split(' ')[2] ?? '?',
+  )
+    .then(({ bin, version }) => ((FFMPEG = bin), { bin, version }))
+    .catch((err) => {
+      ffmpegPromise = null;
+      throw err;
+    });
+  return ffmpegPromise;
+}
+
 const YTDLP_ASSETS = {
   'linux-x64': 'yt-dlp_linux',
   'linux-arm64': 'yt-dlp_linux_aarch64',
@@ -59,39 +168,48 @@ const YTDLP_ASSETS = {
   'win32-x64': 'yt-dlp.exe',
 };
 
-// Finds yt-dlp: YTDLP_PATH, then one installed on the system, otherwise downloads the standalone
-// binary into data/bin (works on hosts like Pterodactyl where nothing can be installed).
+// yt-dlp: YTDLP_PATH, our own up-to-date copy in data/bin (downloaded automatically, so it works on
+// hosts like Pterodactyl where nothing can be installed), or one installed on the system.
 export function ensureYtDlp() {
-  ytdlpPromise ??= (async () => {
-    if (YTDLP) return YTDLP;
-    try {
-      await run('yt-dlp', ['--version'], 10_000);
-      return (YTDLP = 'yt-dlp');
-    } catch {
-      // not installed
-    }
-    const asset = YTDLP_ASSETS[`${process.platform}-${process.arch}`];
-    if (!asset) throw new UserError('yt-dlp nije instaliran, a za ovaj sistem ga ne mogu sam preuzeti.');
-    const file = path.join(dataDir(), 'bin', asset);
-    if (!fs.existsSync(file)) {
-      console.log(`[music] Preuzimam ${asset}...`);
-      const res = await fetch(YTDLP_RELEASES + asset);
-      if (!res.ok) throw new Error(`yt-dlp download ${res.status}`);
-      fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(`${file}.tmp`, Buffer.from(await res.arrayBuffer()), { mode: 0o755 });
-      fs.renameSync(`${file}.tmp`, file);
-    } else {
-      // YouTube changes often; keep our own copy up to date
-      run(file, ['-U'], 120_000).catch((err) => console.warn('[music] yt-dlp update', err.message));
-    }
-    return (YTDLP = file);
-  })().catch((err) => {
-    ytdlpPromise = null;
-    if (err instanceof UserError) throw err;
-    console.error('[music] yt-dlp', err);
-    throw new UserError('Ne mogu pripremiti yt-dlp (potreban za glazbu). Pokušaj ponovno kasnije.');
-  });
+  ytdlpPromise ??= firstWorking(
+    'yt-dlp',
+    [
+      process.env.YTDLP_PATH,
+      async () => {
+        const asset = YTDLP_ASSETS[`${process.platform}-${process.arch}`];
+        if (!asset) return null;
+        const file = path.join(binDir(), asset);
+        if (!fs.existsSync(file)) await download(`https://github.com/yt-dlp/yt-dlp/releases/latest/download/${asset}`, file);
+        // YouTube changes often; keep our own copy up to date
+        else await run(file, ['-U'], 120_000).catch((err) => console.warn('[music] yt-dlp update:', err.message));
+        return file;
+      },
+      'yt-dlp',
+    ],
+    ['--version'],
+    (out) => out.split('\n').pop(),
+  )
+    .then(({ bin, version }) => {
+      YTDLP = bin;
+      // Since 2025.11 YouTube needs a JS runtime to solve its challenges; Node is always here.
+      YTDLP_EXTRA_ARGS = version >= '2025.11.12' ? ['--js-runtimes', `node:${process.execPath}`, '--remote-components', 'ejs:github'] : [];
+      return { bin, version };
+    })
+    .catch((err) => {
+      ytdlpPromise = null;
+      throw err;
+    });
   return ytdlpPromise;
+}
+
+// Logged at startup so problems show up in the console before anyone uses /play.
+export async function checkSetup() {
+  try {
+    const [yt, ff] = await Promise.all([ensureYtDlp(), ensureFfmpeg()]);
+    console.log(`🎵 Glazba spremna (yt-dlp ${yt.version}, ffmpeg ${ff.version})`);
+  } catch (err) {
+    console.error('🎵 Glazba NE radi:', err.message);
+  }
 }
 
 export function formatDuration(ms) {
@@ -139,10 +257,11 @@ function stripMixPlaylist(query) {
 export async function resolveTracks(query, requestedBy) {
   query = stripMixPlaylist(query.trim());
   const isUrl = /^https?:\/\//i.test(query);
-  await ensureYtDlp();
+  await Promise.all([ensureYtDlp(), ensureFfmpeg()]);
   let out;
   try {
     out = await run(YTDLP, [
+      ...YTDLP_EXTRA_ARGS,
       '-J',
       '--flat-playlist',
       '--no-warnings',
@@ -152,8 +271,8 @@ export async function resolveTracks(query, requestedBy) {
     ]);
   } catch (err) {
     if (err instanceof UserError) throw err;
-    console.warn('[music] resolve', err.message);
-    throw new UserError('Ne mogu pronaći tu pjesmu ili link.');
+    console.warn('[music] resolve:', err.message);
+    throw new UserError(explainYtdlpError(err.message) ?? 'Ne mogu pronaći tu pjesmu ili link.');
   }
   const info = JSON.parse(out);
   const entries = info.entries ?? [info];
@@ -183,7 +302,7 @@ class GuildQueue {
       this.skipping = false;
       this.next({ skipping }).catch((err) => console.error('[music]', err));
     });
-    this.player.on('error', (err) => console.warn('[music] player', err.message));
+    this.player.on('error', (err) => console.warn('[music] player:', err.message));
 
     this.connection = joinVoiceChannel({
       channelId: voiceChannel.id,
@@ -192,6 +311,7 @@ class GuildQueue {
       selfDeaf: true,
     });
     this.connection.subscribe(this.player);
+    this.connection.on('error', (err) => console.warn('[music] voice:', err.message));
     this.connection.on(VoiceConnectionStatus.Disconnected, async () => {
       try {
         // moved to another channel / short network hiccup
@@ -225,20 +345,27 @@ class GuildQueue {
   }
 
   killProcesses() {
-    for (const p of this.processes) p.kill('SIGKILL');
+    for (const p of this.processes) stopProcess(p);
     this.processes = [];
   }
 
   createResource(track) {
-    const ytdlp = spawn(YTDLP, ['-f', 'bestaudio/best', '-o', '-', '--quiet', '--no-warnings', '--no-playlist', track.url], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    const ytdlp = spawn(
+      YTDLP,
+      [...YTDLP_EXTRA_ARGS, '-f', 'bestaudio/best', '-o', '-', '--quiet', '--no-warnings', '--no-playlist', track.url],
+      { stdio: ['ignore', 'pipe', 'pipe'], env: childEnv() },
+    );
     const ffmpeg = spawn(
       FFMPEG,
       ['-loglevel', 'error', '-i', 'pipe:0', '-vn', '-c:a', 'libopus', '-b:a', '128k', '-ar', '48000', '-ac', '2', '-f', 'ogg', 'pipe:1'],
-      { stdio: ['pipe', 'pipe', 'ignore'] },
+      { stdio: ['pipe', 'pipe', 'pipe'] },
     );
     let stderr = '';
+    let ffmpegErr = '';
+    ffmpeg.stderr.on('data', (d) => (ffmpegErr += d));
+    ffmpeg.on('close', (code, signal) => {
+      if (code && !signal) console.warn('[music] ffmpeg:', lastErrorLine(ffmpegErr) || `exit ${code}`);
+    });
     ytdlp.stderr.on('data', (d) => (stderr += d));
     ytdlp.stdout.pipe(ffmpeg.stdin);
     for (const stream of [ytdlp.stdout, ffmpeg.stdin, ffmpeg.stdout]) stream.on('error', () => {});
@@ -246,8 +373,12 @@ class GuildQueue {
     ytdlp.on('close', (code, signal) => {
       if (code && !signal) {
         track.failed = true;
-        console.warn('[music] yt-dlp', stderr.trim().split('\n').pop());
-        this.textChannel?.send({ embeds: [musicEmbed(`❌ Ne mogu pustiti **${escapeMd(track.title)}**, preskačem.`)] }).catch(() => {});
+        const reason = lastErrorLine(stderr);
+        console.warn('[music] yt-dlp:', reason);
+        const hint = explainYtdlpError(reason);
+        this.textChannel
+          ?.send({ embeds: [musicEmbed(`❌ Ne mogu pustiti **${escapeMd(track.title)}**, preskačem.${hint ? `\n${hint}` : ''}`)] })
+          .catch(() => {});
       }
     });
     this.processes = [ytdlp, ffmpeg];
@@ -406,8 +537,10 @@ export async function play({ guild, voiceChannel, textChannel, query, requestedB
     try {
       await queue.ready();
     } catch {
+      console.error(`[music] Spajanje na voice nije uspjelo (stanje: ${queue.connection.state.status}).`);
+      console.error(generateDependencyReport());
       queue.destroy();
-      throw new UserError('Ne mogu se spojiti na voice kanal. Pokušaj ponovno.');
+      throw new UserError('Ne mogu se spojiti na voice kanal. Hosting možda blokira UDP promet (pogledaj konzolu bota).');
     }
   } else if (textChannel) {
     queue.textChannel = textChannel;
