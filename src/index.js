@@ -5,6 +5,8 @@ import * as giveaways from './features/giveaways.js';
 import * as invites from './features/invites.js';
 import * as members from './features/members.js';
 import * as music from './features/music.js';
+import * as antinuke from './features/antinuke.js';
+import * as games from './features/games/index.js';
 import { logActivity } from './features/activity.js';
 import { startDashboard } from './dashboard/server.js';
 import * as reactionRoles from './features/reactionRoles.js';
@@ -38,6 +40,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.GuildMessageReactions,
     GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildModeration,
     GatewayIntentBits.MessageContent,
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.User, Partials.GuildMember],
@@ -88,6 +91,7 @@ client.once(Events.ClientReady, async () => {
   for (const guild of client.guilds.cache.values()) await prepareGuild(guild);
   giveaways.start(client);
   music.checkSetup();
+  games.startGames();
 
   // safety net in case some event was missed
   setInterval(() => client.guilds.cache.forEach((guild) => scheduleStatsUpdate(guild)), 10 * 60 * 1000);
@@ -139,7 +143,23 @@ client.on(
 
 client.on(Events.InviteCreate, safe('inviteCreate', invites.onInviteCreate));
 client.on(Events.InviteDelete, safe('inviteDelete', invites.onInviteDelete));
-client.on(Events.ChannelDelete, safe('channelDelete', tickets.onChannelDelete));
+client.on(
+  Events.ChannelDelete,
+  safe('channelDelete', async (channel) => {
+    antinuke.onChannelDelete(channel);
+    tickets.onChannelDelete(channel);
+  }),
+);
+client.on(Events.GuildRoleDelete, safe('roleDelete', antinuke.onRoleDelete));
+client.on(Events.GuildAuditLogEntryCreate, safe('auditLog', antinuke.onAuditLogEntry));
+client.on(
+  Events.MessageCreate,
+  safe('messageCreate', async (message) => {
+    if (!message.inGuild() || message.author.id === client.user.id) return;
+    await antinuke.onMessage(message);
+    if (!message.author.bot) await games.onMessage(message);
+  }),
+);
 client.on(
   Events.MessageDelete,
   safe('messageDelete', async (message) => {
@@ -155,6 +175,7 @@ const componentHandlers = {
   ticket: tickets.handleComponent,
   giveaway: giveaways.handleComponent,
   music: music.handleComponent,
+  ...games.componentHandlers,
 };
 
 client.on(Events.InteractionCreate, async (interaction) => {

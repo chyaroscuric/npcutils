@@ -9,6 +9,9 @@ import * as giveaways from '../features/giveaways.js';
 import * as invites from '../features/invites.js';
 import { DEFAULT_BOOST, DEFAULT_WELCOME, boostPayload, welcomePayload } from '../features/members.js';
 import * as music from '../features/music.js';
+import * as antinuke from '../features/antinuke.js';
+import * as kaladont from '../features/games/kaladont.js';
+import { clearWarns } from '../features/moderation.js';
 import * as reactionRoles from '../features/reactionRoles.js';
 import { STATS, removeStats, setupStats } from '../features/stats.js';
 import { closeTicketChannel, panelPayload } from '../features/tickets.js';
@@ -233,6 +236,9 @@ export function startDashboard(client, port) {
           logChannelId: g.config.tickets?.logChannelId ?? null,
           openCount: Object.keys(g.tickets.open).length,
         },
+        antinuke: { enabled: antinuke.getConfig(guild.id).enabled },
+        modLogChannelId: g.config.modLogChannelId ?? null,
+        kaladontCount: kaladont.activeGames(guild.id).length,
       },
       activity: recentActivity(guild.id),
     });
@@ -479,6 +485,73 @@ export function startDashboard(client, port) {
   api.delete('/guilds/:gid/giveaways/:messageId', async (req, res) => {
     findGiveaway(req);
     await giveaways.deleteGiveaway(req.guild.id, req.params.messageId);
+    ok(res);
+  });
+
+  // ---------- anti-nuke ----------
+  api.get('/guilds/:gid/antinuke', (req, res) => {
+    const me = req.guild.members.me;
+    res.json({
+      canEdit: antinuke.canConfigure(req.guild, req.userId),
+      owner: userInfo(req.guild, req.guild.ownerId),
+      botCanSeeAuditLog: me.permissions.has(PermissionFlagsBits.ViewAuditLog),
+      botRoleIsHighest: me.roles.highest.position === Math.max(...req.guild.roles.cache.map((r) => r.position)),
+      rules: Object.entries(antinuke.RULES).map(([key, r]) => ({ key, label: r.label, limited: r.limited })),
+      punishments: Object.entries(antinuke.PUNISHMENTS).map(([key, label]) => ({ key, label })),
+      config: antinuke.getConfig(req.guild.id),
+      incidents: antinuke.incidents(req.guild.id),
+    });
+  });
+  api.put('/guilds/:gid/antinuke', (req, res) => {
+    if (!antinuke.canConfigure(req.guild, req.userId)) throw new UserError('Anti-nuke postavke može mijenjati samo vlasnik servera.');
+    const body = req.body ?? {};
+    if (body.logChannelId) textChannel(req.guild, body.logChannelId);
+    if (body.enabled && !req.guild.members.me.permissions.has(PermissionFlagsBits.ViewAuditLog)) {
+      throw new UserError('Bot treba permisiju View Audit Log (najbolje Administrator).');
+    }
+    ok(res, { config: antinuke.saveConfig(req.guild.id, body) });
+  });
+
+  // ---------- moderation ----------
+  api.get('/guilds/:gid/moderation', (req, res) => {
+    const warnings = Object.entries(req.g.warns ?? {})
+      .filter(([, list]) => list.length)
+      .map(([userId, list]) => ({
+        user: userInfo(req.guild, userId),
+        warnings: list.map((w) => ({ id: w.id, reason: w.reason, at: w.at, by: userInfo(req.guild, w.by) })),
+      }))
+      .sort((a, b) => b.warnings.at(-1).at - a.warnings.at(-1).at);
+    res.json({ modLogChannelId: req.g.config.modLogChannelId ?? null, warnings });
+  });
+  api.put('/guilds/:gid/moderation', (req, res) => {
+    req.g.config.modLogChannelId = optionalText(req.guild, req.body?.modLogChannelId)?.id ?? null;
+    db.save();
+    ok(res);
+  });
+  api.delete('/guilds/:gid/warnings/:userId', (req, res) => {
+    ok(res, { removed: clearWarns(req.guild.id, req.params.userId) });
+  });
+  api.delete('/guilds/:gid/warnings/:userId/:warnId', (req, res) => {
+    ok(res, { removed: clearWarns(req.guild.id, req.params.userId, Number(req.params.warnId)) });
+  });
+
+  // ---------- games ----------
+  api.get('/guilds/:gid/games', (req, res) => {
+    res.json({
+      kaladont: kaladont.activeGames(req.guild.id).map((k) => ({
+        ...k,
+        channelName: req.guild.channels.cache.get(k.channelId)?.name ?? 'obrisan-kanal',
+        lastUser: k.lastUserId ? userInfo(req.guild, k.lastUserId) : null,
+      })),
+    });
+  });
+  api.post('/guilds/:gid/games/kaladont', async (req, res) => {
+    await kaladont.start(textChannel(req.guild, req.body?.channelId));
+    ok(res);
+  });
+  api.delete('/guilds/:gid/games/kaladont/:channelId', (req, res) => {
+    // works for deleted channels too
+    kaladont.stop({ id: req.params.channelId, guild: req.guild });
     ok(res);
   });
 

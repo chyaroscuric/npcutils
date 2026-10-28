@@ -19,6 +19,12 @@ export async function execute(interaction) {
       { name: '😀 Reaction roles', value: '`/reactionrole create` • `/reactionrole add` • `/reactionrole remove` • `/reactionrole list`' },
       { name: '🎉 Giveaway', value: '`/giveaway start` • `/giveaway end` • `/giveaway reroll` • `/giveaway list` • `/giveaway delete`' },
       { name: '🎵 Glazba', value: '`/play` • `/skip` • `/pause` • `/resume` • `/stop` • `/queue` • `/loop` • `/shuffle` • `/remove`' },
+      { name: '🎮 Igre', value: '`/zastava` • `/wordle` • `/kaladont start|stop` • `/ship`' },
+      {
+        name: '🔨 Moderacija',
+        value: '`/purge` • `/ban` • `/unban` • `/kick` • `/timeout` • `/untimeout` • `/warn` • `/warnings` • `/clearwarns` • `/slowmode` • `/lock` • `/unlock` • `/modlog`',
+      },
+      { name: '🛡️ Anti-nuke', value: '`/antinuke status` • `/antinuke ukljuci` • `/antinuke pravilo` • `/antinuke postavke` • `/antinuke whitelist`' },
     )
     .setFooter({ text: 'Jaankeza Utils' });
   if (process.env.DASHBOARD_URL && process.env.CLIENT_SECRET) {

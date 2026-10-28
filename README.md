@@ -14,6 +14,9 @@ Custom Discord bot napravljen u [discord.js](https://discord.js.org) v14.
 | 😀 **Reaction roles** | Klikni emoji → dobiješ rolu, makni reakciju → izgubiš rolu |
 | 🎉 **Giveaway** | Giveaway s gumbom za prijavu, automatsko izvlačenje, reroll |
 | 🎵 **Glazba** | `/play` s YouTubea, SoundClouda, playliste ili pretrage; red, loop, shuffle, gumbi za kontrolu |
+| 🎮 **Igre** | Pogodi državu (zastave), Wordle, Kaladont, Ship |
+| 🔨 **Moderacija** | `/purge`, `/ban`, `/kick`, `/timeout`, `/warn`, `/lock`, `/slowmode`… s logom moderacije |
+| 🛡️ **Anti-nuke** | Kažnjava i vraća masovne banove, kickove, brisanje kanala/rola, dodavanje botova… |
 | 🌐 **Dashboard** | Web stranica s Discord prijavom — sve gore navedeno podesiš iz browsera, bez komandi |
 
 ---
@@ -104,11 +107,42 @@ Vidiš samo servere na kojima je bot i na kojima imaš permisiju **Manage Server
 - Ispod poruke "Sada svira" su gumbi ⏯️ ⏭️ ⏹️ 🔁 🔀. Upravljati može samo netko tko je u istom voice kanalu.
 - Bot izlazi iz kanala nakon 2 min bez glazbe ili 1 min kad nitko ne sluša.
 
-Treba `ffmpeg` i `yt-dlp`: ffmpeg dolazi iz npm paketa `ffmpeg-static`, a yt-dlp se pri prvom `/play` sam preuzme u `data/bin` (i ažurira pri svakom pokretanju). Ako je yt-dlp već instaliran na sistemu, koristi se on. Spotify linkovi nisu podržani.
+Treba `ffmpeg` i `yt-dlp`: bot ih sam preuzme u `data/bin` (yt-dlp se jednom dnevno ažurira). Spotify linkovi nisu podržani (Spotify ne dopušta preuzimanje zvuka).
+
+Brzina: bot odmah dobije direktan link na zvuk, ne rekodira YouTubeov Opus i unaprijed priprema iduću pjesmu u redu, pa je prijelaz između pjesama gotovo trenutan. Ako YouTube blokira neki video, bot istu pjesmu automatski potraži na SoundCloudu.
 
 > YouTube ponekad blokira IP adrese hostinga ("Sign in to confirm you're not a bot"). Tada pomaže druga lokacija servera ili SoundCloud linkovi.
 
 ---
+
+## 🎮 Igre
+
+- `/zastava [kontinent]` — bot pokaže zastavu, prvi tko u chat upiše državu (hrvatski ili engleski naziv) pobjeđuje. Gumbi **Preskoči**, **Pomoć** i **Igraj ponovno**.
+- `/wordle` — pogodi riječ od 5 slova u 6 pokušaja (svatko igra svoju igru, klikom na **Pogodi**).
+- `/kaladont start` / `stop` — u tom kanalu svaka poruka od jedne riječi je potez: riječ mora počinjati sa zadnja dva slova prethodne, isti igrač ne smije dvaput zaredom, a tko napiše riječ na **-nt** pobjeđuje. Riječi se provjeravaju u hrvatskom i srpskom rječniku (preuzme se sam u `data/dict`).
+- `/ship korisnik1 [korisnik2]` — slika s avatarima i postotkom.
+
+## 🔨 Moderacija
+
+`/purge broj [korisnik] [botovi] [sadrzi]`, `/ban`, `/unban`, `/kick`, `/timeout trajanje` (npr. `10m`, `1d`), `/untimeout`, `/warn`, `/warnings`, `/clearwarns`, `/slowmode`, `/lock`, `/unlock`. Sve akcije idu u kanal postavljen s `/modlog kanal`. Bot ne dopušta kažnjavanje vlasnika ni nekoga s jednakom ili višom rolom.
+
+## 🛡️ Anti-nuke
+
+Štiti server od nekoga tko zloupotrijebi permisije (npr. hakiran admin). Bot prati audit log i, kad netko prijeđe limit, kazni ga (ban / kick / oduzimanje rola / timeout) i vrati štetu: odbanira ljude, obriše spam kanale i role, ponovno napravi obrisane kanale i role, makne opasne role.
+
+| Pravilo | Zadani limit |
+| --- | --- |
+| Anti ban / kick | 1 |
+| Anti role create / channel create | 3 |
+| Anti role delete / channel delete | 2 |
+| Anti mention (@everyone/@here) | 0 |
+| Anti bot add, prune, opasne permisije na roli, dodavanje opasne role | kazna odmah |
+
+Limit znači koliko puta netko smije napraviti akciju u vremenskom prozoru (zadano 60 s); kad ga prijeđe, kažnjen je. Uključi s `/antinuke ukljuci ukljuceno:True`, podesi s `/antinuke pravilo`, `/antinuke postavke` i `/antinuke whitelist`, ili na stranici **Anti-nuke** u dashboardu.
+
+- Postavke može mijenjati **samo vlasnik servera**. Vlasnik i sam bot su uvijek izuzeti.
+- Rola bota mora biti **na vrhu** popisa rola, inače ne može kazniti nekoga s višom rolom.
+- Upozorenje ide u log kanal i vlasniku u DM.
 
 ## 4. Podešavanje na serveru
 
