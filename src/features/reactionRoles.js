@@ -1,7 +1,7 @@
 // Reaction roles: react on a message -> get role, remove reaction -> lose role.
 import { EmbedBuilder } from 'discord.js';
 import * as db from '../db.js';
-import { COLOR, roleProblem } from '../utils/helpers.js';
+import { COLOR, UserError, roleProblem } from '../utils/helpers.js';
 
 // Unicode emojis sometimes come with/without the variation selector, so compare without it.
 export function emojiKey(emoji) {
@@ -28,6 +28,76 @@ export function managedPayload(entry) {
 
 export async function refreshManagedMessage(message, entry) {
   if (entry.managed && message.editable) await message.edit(managedPayload(entry));
+}
+
+export const DEFAULT_DESCRIPTION = 'Klikni na emoji ispod da dobiješ rolu. Makni reakciju da je izgubiš.';
+
+// Posts a new embed that lists its emoji -> role pairs and keeps itself up to date.
+export async function createManagedMessage(channel, title, description) {
+  const entry = {
+    channelId: channel.id,
+    roles: {},
+    managed: true,
+    title,
+    baseDescription: description?.replace(/\\n/g, '\n') || DEFAULT_DESCRIPTION,
+  };
+  let message;
+  try {
+    message = await channel.send(managedPayload(entry));
+  } catch {
+    throw new UserError(`Ne mogu slati poruke u ${channel}.`);
+  }
+  db.guild(channel.guild.id).reactionRoles[message.id] = entry;
+  db.save();
+  return message;
+}
+
+export async function addReactionRole(channel, messageId, emojiInput, role) {
+  const message = await channel.messages.fetch(messageId).catch(() => null);
+  if (!message) throw new UserError('Ne mogu naći tu poruku. Provjeri ID poruke i kanal.');
+  const emoji = parseEmoji(emojiInput);
+  if (!emoji) throw new UserError('Neispravan emoji.');
+  const problem = roleProblem(channel.guild, role);
+  if (problem) throw new UserError(problem);
+  try {
+    await message.react(emoji.react);
+  } catch {
+    throw new UserError('Ne mogu reagirati tim emojijem (custom emoji mora biti sa servera na kojem sam).');
+  }
+  const g = db.guild(channel.guild.id);
+  const entry = (g.reactionRoles[message.id] ??= { channelId: message.channel.id, roles: {}, managed: false });
+  entry.roles[emoji.key] = { roleId: role.id, emoji: emoji.display };
+  db.save();
+  await refreshManagedMessage(message, entry).catch(() => {});
+  return { message, emoji };
+}
+
+export async function removeReactionRole(guild, messageId, key) {
+  const g = db.guild(guild.id);
+  const entry = g.reactionRoles[messageId];
+  if (!entry?.roles[key]) throw new UserError('Taj emoji nije povezan ni s jednom rolom na toj poruci.');
+  delete entry.roles[key];
+  if (!entry.managed && !Object.keys(entry.roles).length) delete g.reactionRoles[messageId];
+  db.save();
+  const message = await guild.channels.cache.get(entry.channelId)?.messages.fetch(messageId).catch(() => null);
+  if (message) {
+    const reaction = message.reactions.cache.find((r) => emojiKey(r.emoji) === key);
+    await reaction?.users.remove(guild.client.user.id).catch(() => {});
+    await refreshManagedMessage(message, entry).catch(() => {});
+  }
+}
+
+// Stops tracking a message; bot-made (managed) messages are deleted too.
+export async function deleteReactionRoleMessage(guild, messageId) {
+  const g = db.guild(guild.id);
+  const entry = g.reactionRoles[messageId];
+  if (!entry) throw new UserError('Ta poruka nije reaction role poruka.');
+  delete g.reactionRoles[messageId];
+  db.save();
+  if (entry.managed) {
+    const message = await guild.channels.cache.get(entry.channelId)?.messages.fetch(messageId).catch(() => null);
+    await message?.delete().catch(() => {});
+  }
 }
 
 async function resolve(reaction, user) {

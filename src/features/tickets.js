@@ -13,7 +13,8 @@ import {
   TextInputStyle,
 } from 'discord.js';
 import * as db from '../db.js';
-import { COLOR, COLOR_ERR, fail, reply } from '../utils/helpers.js';
+import { COLOR, COLOR_ERR, UserError, fail, reply } from '../utils/helpers.js';
+import { logActivity } from './activity.js';
 
 const MEMBER_PERMS = [
   PermissionFlagsBits.ViewChannel,
@@ -126,6 +127,7 @@ async function createTicket(interaction) {
 
   g.tickets.open[channel.id] = { ownerId: interaction.user.id, number, reason, createdAt: Date.now() };
   db.save();
+  logActivity(guild.id, 'ticket_open', `${interaction.user.username} je otvorio/la tiket #${number}`);
 
   const embed = new EmbedBuilder()
     .setColor(COLOR)
@@ -185,15 +187,26 @@ async function buildTranscript(channel) {
 }
 
 async function closeTicket(interaction) {
-  const channel = interaction.channel;
-  const g = db.guild(interaction.guild.id);
-  const ticket = getTicket(channel);
-  if (!ticket) return interaction.update({ content: 'Ovo više nije otvoren tiket.', embeds: [], components: [] });
-
+  if (!getTicket(interaction.channel)) {
+    return interaction.update({ content: 'Ovo više nije otvoren tiket.', embeds: [], components: [] });
+  }
   await interaction.update({ content: '🔒 Zatvaram tiket...', embeds: [], components: [] });
-  await channel.send({ embeds: [new EmbedBuilder().setColor(COLOR_ERR).setDescription(`🔒 Tiket zatvara ${interaction.user}. Kanal se briše za 5 sekundi.`)] });
+  await closeTicketChannel(interaction.channel, { id: interaction.user.id, name: interaction.user.tag });
+}
 
-  const logChannel = g.config.tickets?.logChannelId && interaction.guild.channels.cache.get(g.config.tickets.logChannelId);
+// Posts the transcript to the log channel and deletes the ticket channel. Used by the button and the dashboard.
+export async function closeTicketChannel(channel, closedBy) {
+  const g = db.guild(channel.guild.id);
+  const ticket = g.tickets.open[channel.id];
+  if (!ticket) throw new UserError('Ovo nije otvoren tiket.');
+  delete g.tickets.open[channel.id];
+  db.save();
+
+  await channel
+    .send({ embeds: [new EmbedBuilder().setColor(COLOR_ERR).setDescription(`🔒 Tiket zatvara <@${closedBy.id}>. Kanal se briše za 5 sekundi.`)] })
+    .catch(() => {});
+
+  const logChannel = g.config.tickets?.logChannelId && channel.guild.channels.cache.get(g.config.tickets.logChannelId);
   if (logChannel) {
     try {
       const transcript = await buildTranscript(channel);
@@ -203,7 +216,7 @@ async function closeTicket(interaction) {
         .setTitle(`🎫 Tiket #${ticket.number} zatvoren`)
         .addFields(
           { name: 'Otvorio/la', value: `<@${ticket.ownerId}>`, inline: true },
-          { name: 'Zatvorio/la', value: `${interaction.user}`, inline: true },
+          { name: 'Zatvorio/la', value: `<@${closedBy.id}>`, inline: true },
           { name: 'Otvoren', value: `<t:${Math.floor(ticket.createdAt / 1000)}:f>`, inline: true },
           { name: 'Razlog', value: (ticket.reason || 'Nije naveden.').slice(0, 1024) },
         )
@@ -214,9 +227,8 @@ async function closeTicket(interaction) {
     }
   }
 
-  delete g.tickets.open[channel.id];
-  db.save();
-  setTimeout(() => channel.delete(`Tiket zatvorio ${interaction.user.tag}`).catch(() => {}), 5000);
+  logActivity(channel.guild.id, 'ticket_close', `Tiket #${ticket.number} zatvorio/la ${closedBy.name}`);
+  setTimeout(() => channel.delete(`Tiket zatvorio ${closedBy.name}`).catch(() => {}), 5000);
 }
 
 export function onChannelDelete(channel) {

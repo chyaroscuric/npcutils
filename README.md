@@ -13,6 +13,8 @@ Custom Discord bot napravljen u [discord.js](https://discord.js.org) v14.
 | 🚀 **Boost poruka** | Poruka zahvale kad netko boosta server |
 | 😀 **Reaction roles** | Klikni emoji → dobiješ rolu, makni reakciju → izgubiš rolu |
 | 🎉 **Giveaway** | Giveaway s gumbom za prijavu, automatsko izvlačenje, reroll |
+| 🎵 **Glazba** | `/play` s YouTubea, SoundClouda, playliste ili pretrage; red, loop, shuffle, gumbi za kontrolu |
+| 🌐 **Dashboard** | Web stranica s Discord prijavom — sve gore navedeno podesiš iz browsera, bez komandi |
 
 ---
 
@@ -30,7 +32,8 @@ Custom Discord bot napravljen u [discord.js](https://discord.js.org) v14.
    https://discord.com/oauth2/authorize?client_id=CLIENT_ID&permissions=8&scope=bot%20applications.commands
    ```
 
-4. ⚠️ U **Server Settings → Roles** pomakni rolu **Jaankeza Utils** **iznad** svih rola koje bot treba davati (Member, reaction role…). Bot ne može dati rolu koja je iznad njegove.
+4. **OAuth2** tab (za dashboard): kopiraj **Client Secret** i pod **Redirects** dodaj `<DASHBOARD_URL>/callback`, npr. `http://localhost:3000/callback` ili `https://bot.tvojadomena.com/callback`.
+5. ⚠️ U **Server Settings → Roles** pomakni rolu **Jaankeza Utils** **iznad** svih rola koje bot treba davati (Member, reaction role…). Bot ne može dati rolu koja je iznad njegove.
 
 ## 2. Pokretanje
 
@@ -44,7 +47,11 @@ npm install
 cp .env.example .env
 ```
 
-U `.env` upiši `DISCORD_TOKEN=...` (i po želji `GUILD_ID=` ID svog servera — tada se slash komande pojave odmah).
+U `.env` upiši:
+
+- `DISCORD_TOKEN` — token bota
+- `PORT`, `CLIENT_SECRET`, `DASHBOARD_URL` — za dashboard (vidi [Dashboard](#-dashboard))
+- po želji `GUILD_ID` — ID tvog servera, tada se slash komande pojave odmah
 
 ```bash
 npm start
@@ -72,9 +79,34 @@ npm install -g pm2
 pm2 start ecosystem.config.cjs && pm2 save && pm2 startup
 ```
 
-**Opcija C — hosting koji traži otvoren port** (Render, Railway, Replit…): postavi `PORT` u env varijablama. Bot tada na tom portu vraća status (`{"online": true, ...}`), pa ga možeš pingati s UptimeRobotom.
+**Opcija C — hosting za botove** (Pterodactyl panel, Render, Railway…): postavi env varijable iz `.env.example`. Na `PORT` radi dashboard, a `/health` vraća status (`{"online": true, ...}`) pa ga možeš pingati s UptimeRobotom. Na Pterodactylu kao `PORT` upiši port koji ti je panel dodijelio (allocation), a `DASHBOARD_URL` je `http://IP:PORT` tog servera.
 
 > Na Dockeru/hostingu obavezno sačuvaj `data/` folder (volume), inače se izgube postavke i invite-ovi.
+
+---
+
+## 🌐 Dashboard
+
+Dashboard je web stranica na kojoj se prijaviš Discordom i podesiš sve bez komandi: welcome i boost poruke, autorole, stats kanale, tikete (i zatvaranje otvorenih), invite-ove (bonus, reset), reaction role, giveawaye i glazbu (dodavanje pjesama, pauza, skip, red).
+
+1. U `.env` postavi `PORT` (npr. `3000`), `CLIENT_SECRET` (Developer Portal → OAuth2) i `DASHBOARD_URL` (adresa na kojoj se otvara, npr. `http://localhost:3000`).
+2. U Developer Portalu → OAuth2 → Redirects dodaj `DASHBOARD_URL` + `/callback`.
+3. Pokreni bota i otvori `DASHBOARD_URL`.
+
+Vidiš samo servere na kojima je bot i na kojima imaš permisiju **Manage Server**. Boju sučelja mijenjaš pod **Izgled** (dolje lijevo).
+
+> Ako dashboard ide na internet, stavi ga iza HTTPS-a (npr. Cloudflare Tunnel ili nginx) i u `DASHBOARD_URL` upiši `https://...`.
+
+## 🎵 Glazba
+
+- `/play pjesma:<naziv ili link>` — naziv pjesme (traži na YouTubeu), YouTube/SoundCloud link ili playlista (do 100 pjesama). Moraš biti u voice kanalu.
+- `/skip`, `/pause`, `/resume`, `/stop` (očisti red i izađi), `/queue`, `/loop` (isključeno / pjesma / cijeli red), `/shuffle`, `/remove broj`.
+- Ispod poruke "Sada svira" su gumbi ⏯️ ⏭️ ⏹️ 🔁 🔀. Upravljati može samo netko tko je u istom voice kanalu.
+- Bot izlazi iz kanala nakon 2 min bez glazbe ili 1 min kad nitko ne sluša.
+
+Treba `ffmpeg` i `yt-dlp`: ffmpeg dolazi iz npm paketa `ffmpeg-static`, a yt-dlp se pri prvom `/play` sam preuzme u `data/bin` (i ažurira pri svakom pokretanju). Ako je yt-dlp već instaliran na sistemu, koristi se on. Spotify linkovi nisu podržani.
+
+> YouTube ponekad blokira IP adrese hostinga ("Sign in to confirm you're not a bot"). Tada pomaže druga lokacija servera ili SoundCloud linkovi.
 
 ---
 
@@ -140,6 +172,7 @@ src/
   index.js            # pokretanje, eventi, registracija komandi
   db.js               # JSON baza (data/db.json)
   commands/           # slash komande
-  features/           # logika: stats, tickets, invites, members (welcome/autorole/boost), reactionRoles, giveaways
+  features/           # logika: stats, tickets, invites, members (welcome/autorole/boost), reactionRoles, giveaways, music
+  dashboard/          # server.js (Express API + Discord login) i public/ (sučelje)
 test/                 # npm test, npm run check
 ```

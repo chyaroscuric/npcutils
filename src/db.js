@@ -6,8 +6,10 @@ let FILE = null;
 let data = { guilds: {} };
 let saveTimer = null;
 
+export const dataDir = () => path.resolve(process.env.DATA_DIR || 'data');
+
 export function load() {
-  const dir = path.resolve(process.env.DATA_DIR || 'data');
+  const dir = dataDir();
   fs.mkdirSync(dir, { recursive: true });
   FILE = path.join(dir, 'db.json');
   if (fs.existsSync(FILE)) {

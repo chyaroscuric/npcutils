@@ -1,14 +1,16 @@
-import http from 'node:http';
 import { ActivityType, Client, Events, GatewayIntentBits, MessageFlags, Partials } from 'discord.js';
 import * as db from './db.js';
 import { loadCommands } from './loadCommands.js';
 import * as giveaways from './features/giveaways.js';
 import * as invites from './features/invites.js';
 import * as members from './features/members.js';
+import * as music from './features/music.js';
+import { logActivity } from './features/activity.js';
+import { startDashboard } from './dashboard/server.js';
 import * as reactionRoles from './features/reactionRoles.js';
 import { scheduleStatsUpdate } from './features/stats.js';
 import * as tickets from './features/tickets.js';
-import { fail } from './utils/helpers.js';
+import { UserError, fail } from './utils/helpers.js';
 
 const BOT_NAME = 'Jaankeza Utils';
 const STATUS = 'discord.gg/jaankeza';
@@ -35,6 +37,7 @@ const client = new Client({
     GatewayIntentBits.GuildInvites,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.MessageContent,
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.User, Partials.GuildMember],
@@ -100,6 +103,8 @@ client.on(
     });
     await members.giveAutoroles(member).catch((err) => console.error('[autorole]', err));
     await members.sendWelcome(member, inviterId).catch((err) => console.error('[welcome]', err));
+    const inviter = inviterId ? (await client.users.fetch(inviterId).catch(() => null))?.username : null;
+    logActivity(member.guild.id, 'join', `${member.user.username} se pridružio/la${inviter ? ` (pozvao/la: ${inviter})` : ''}`);
     scheduleStatsUpdate(member.guild);
   }),
 );
@@ -108,6 +113,7 @@ client.on(
   Events.GuildMemberRemove,
   safe('memberRemove', async (member) => {
     invites.onMemberLeave(member);
+    logActivity(member.guild.id, 'leave', `${member.user?.username ?? 'Netko'} je napustio/la server`);
     scheduleStatsUpdate(member.guild);
   }),
 );
@@ -116,6 +122,9 @@ client.on(
   Events.GuildMemberUpdate,
   safe('memberUpdate', async (oldMember, newMember) => {
     if (oldMember.premiumSinceTimestamp !== newMember.premiumSinceTimestamp) scheduleStatsUpdate(newMember.guild);
+    if (!oldMember.partial && !oldMember.premiumSinceTimestamp && newMember.premiumSinceTimestamp) {
+      logActivity(newMember.guild.id, 'boost', `${newMember.user.username} je boostao/la server`);
+    }
     await members.onMemberUpdate(oldMember, newMember);
   }),
 );
@@ -137,12 +146,14 @@ client.on(
     giveaways.onMessageDelete(message);
   }),
 );
+client.on(Events.VoiceStateUpdate, safe('voiceState', music.onVoiceStateUpdate));
 client.on(Events.MessageReactionAdd, safe('reactionAdd', reactionRoles.onReactionAdd));
 client.on(Events.MessageReactionRemove, safe('reactionRemove', reactionRoles.onReactionRemove));
 
 const componentHandlers = {
   ticket: tickets.handleComponent,
   giveaway: giveaways.handleComponent,
+  music: music.handleComponent,
 };
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -158,6 +169,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await componentHandlers[interaction.customId.split(':')[0]]?.(interaction);
     }
   } catch (err) {
+    if (err instanceof UserError) {
+      if (interaction.isRepliable()) await fail(interaction, err.message).catch(() => {});
+      return;
+    }
     console.error(`[interaction] ${interaction.commandName ?? interaction.customId}`, err);
     if (interaction.isRepliable()) await fail(interaction, 'Došlo je do greške. Pokušaj ponovno.').catch(() => {});
   }
@@ -186,16 +201,8 @@ function shutdown(code = 0) {
 process.on('SIGINT', () => shutdown(0));
 process.on('SIGTERM', () => shutdown(0));
 
-// Optional HTTP endpoint for hosts that need an open port / uptime monitors (UptimeRobot etc.).
-if (PORT) {
-  http
-    .createServer((req, res) => {
-      const online = client.isReady();
-      res.writeHead(online ? 200 : 503, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ bot: BOT_NAME, online, ping: client.ws.ping, uptime: client.uptime }));
-    })
-    .listen(PORT, () => console.log(`Keep-alive server na portu ${PORT}`));
-}
+// Web dashboard (+ /health endpoint for uptime monitors) when PORT is set.
+if (PORT) startDashboard(client, Number(PORT));
 
 try {
   await client.login(DISCORD_TOKEN);

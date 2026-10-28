@@ -2,6 +2,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags } from 'discord.js';
 import * as db from '../db.js';
 import { fail } from '../utils/helpers.js';
+import { logActivity } from './activity.js';
 
 const COLOR_ACTIVE = 0xfee75c;
 const COLOR_ENDED = 0x2b2d31;
@@ -78,6 +79,7 @@ export async function createGiveaway({ channel, hostId, prize, winners, duration
   const message = await channel.send(giveawayPayload(gw));
   db.guild(channel.guild.id).giveaways[message.id] = gw;
   db.save();
+  logActivity(channel.guild.id, 'giveaway_start', `Pokrenut giveaway: ${prize}`);
   return message;
 }
 
@@ -120,6 +122,8 @@ export async function endGiveaway(guildId, messageId) {
   gw.endsAt = Math.min(gw.endsAt, Date.now());
   gw.winnerIds = pickWinners(gw.entrants, gw.winners, guild);
   db.save();
+  const names = gw.winnerIds.map((id) => guild.members.cache.get(id)?.user.username ?? id);
+  logActivity(guildId, 'giveaway_end', `Giveaway ${gw.prize} završen${names.length ? `, pobjednici: ${names.join(', ')}` : ', bez pobjednika'}`);
 
   const message = await fetchMessage(guild, gw, messageId);
   if (!message) return gw;

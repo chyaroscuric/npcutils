@@ -18,7 +18,11 @@ export async function execute(interaction) {
       { name: '🏷️ Autorole', value: '`/autorole add` • `/autorole remove` • `/autorole list`' },
       { name: '😀 Reaction roles', value: '`/reactionrole create` • `/reactionrole add` • `/reactionrole remove` • `/reactionrole list`' },
       { name: '🎉 Giveaway', value: '`/giveaway start` • `/giveaway end` • `/giveaway reroll` • `/giveaway list` • `/giveaway delete`' },
+      { name: '🎵 Glazba', value: '`/play` • `/skip` • `/pause` • `/resume` • `/stop` • `/queue` • `/loop` • `/shuffle` • `/remove`' },
     )
     .setFooter({ text: 'Jaankeza Utils' });
+  if (process.env.DASHBOARD_URL && process.env.CLIENT_SECRET) {
+    embed.setDescription(`Sve se može podesiti i preko dashboarda: ${process.env.DASHBOARD_URL}`);
+  }
   await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }

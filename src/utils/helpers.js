@@ -43,3 +43,6 @@ export function roleProblem(guild, role) {
 export function isAdmin(member) {
   return member.permissions.has(PermissionFlagsBits.ManageGuild);
 }
+
+// An error whose message can be shown to the user as-is (slash command reply or dashboard toast).
+export class UserError extends Error {}

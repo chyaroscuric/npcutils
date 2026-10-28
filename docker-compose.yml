@@ -4,5 +4,7 @@ services:
     container_name: jaankeza-utils
     restart: unless-stopped # bot se sam ponovno pokrene nakon pada ili restarta servera
     env_file: .env
+    ports:
+      - "3000:3000" # dashboard (mora odgovarati PORT u .env)
     volumes:
       - ./data:/app/data
