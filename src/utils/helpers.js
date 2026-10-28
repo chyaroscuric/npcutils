@@ -11,11 +11,11 @@ export function embed(description, color = COLOR) {
 
 // Replies ephemerally whether or not the interaction was already acknowledged.
 export async function reply(interaction, content, { ok = true, ephemeral = true } = {}) {
-  const payload = {
-    embeds: [embed(content, ok ? COLOR_OK : COLOR_ERR)],
-    flags: ephemeral ? MessageFlags.Ephemeral : undefined,
-  };
-  if (interaction.deferred || interaction.replied) return interaction.followUp(payload);
+  const embeds = [embed(content, ok ? COLOR_OK : COLOR_ERR)];
+  // a deferred reply keeps the visibility chosen in deferReply()
+  if (interaction.deferred && !interaction.replied) return interaction.editReply({ embeds });
+  const payload = { embeds, flags: ephemeral ? MessageFlags.Ephemeral : undefined };
+  if (interaction.replied) return interaction.followUp(payload);
   return interaction.reply(payload);
 }
 

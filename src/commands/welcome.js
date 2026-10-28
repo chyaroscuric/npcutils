@@ -3,6 +3,9 @@ import * as db from '../db.js';
 import { DEFAULT_WELCOME, welcomePayload } from '../features/members.js';
 import { fail, reply } from '../utils/helpers.js';
 
+// Acknowledged right away (ephemeral) because these commands talk to Discord and can take >3 s.
+export const deferEphemeral = true;
+
 export const data = new SlashCommandBuilder()
   .setName('welcome')
   .setDescription('Poruka kad netko uđe na server')

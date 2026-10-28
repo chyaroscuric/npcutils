@@ -29,3 +29,18 @@ test('parseEmoji', () => {
   assert.equal(parseEmoji('hello'), null);
   assert.equal(parseEmoji(''), null);
 });
+
+test('reply edits a deferred response, then follows up', async () => {
+  const { reply } = await import('../src/utils/helpers.js');
+  const calls = [];
+  const interaction = {
+    deferred: true,
+    replied: false,
+    editReply: async () => { calls.push('edit'); interaction.replied = true; },
+    followUp: async () => calls.push('followUp'),
+    reply: async () => calls.push('reply'),
+  };
+  await reply(interaction, 'a');
+  await reply(interaction, 'b');
+  assert.deepEqual(calls, ['edit', 'followUp']);
+});

@@ -1,4 +1,4 @@
-import { ChannelType, InteractionContextType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
+import { ChannelType, InteractionContextType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import * as db from '../db.js';
 import { askClose, panelPayload, setMemberAccess } from '../features/tickets.js';
 import { fail, isAdmin, reply } from '../utils/helpers.js';
@@ -66,6 +66,7 @@ export async function execute(interaction) {
 
   if (sub === 'panel') {
     if (!db.guild(interaction.guild.id).config.tickets) return fail(interaction, 'Prvo pokreni `/ticket setup`.');
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const channel = interaction.options.getChannel('kanal') ?? interaction.channel;
     const title = interaction.options.getString('naslov');
     const description = interaction.options.getString('opis')?.replace(/\\n/g, '\n');

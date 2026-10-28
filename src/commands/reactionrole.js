@@ -9,6 +9,9 @@ const channelOption = (o) =>
     .setDescription('Kanal u kojem je poruka (default: ovaj)')
     .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement);
 
+// Acknowledged right away (ephemeral) because these commands talk to Discord and can take >3 s.
+export const deferEphemeral = true;
+
 export const data = new SlashCommandBuilder()
   .setName('reactionrole')
   .setDescription('Reaction roles - klikni emoji, dobij rolu')

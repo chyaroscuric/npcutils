@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { ActivityType, Client, Events, GatewayIntentBits, Partials } from 'discord.js';
+import { ActivityType, Client, Events, GatewayIntentBits, MessageFlags, Partials } from 'discord.js';
 import * as db from './db.js';
 import { loadCommands } from './loadCommands.js';
 import * as giveaways from './features/giveaways.js';
@@ -149,7 +149,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.inGuild()) return;
   try {
     if (interaction.isChatInputCommand()) {
-      await commands.get(interaction.commandName)?.execute(interaction);
+      const command = commands.get(interaction.commandName);
+      if (!command) return;
+      // Discord only waits 3 s for the first response; slow commands acknowledge first and edit later.
+      if (command.deferEphemeral) await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      await command.execute(interaction);
     } else if (interaction.isButton() || interaction.isModalSubmit()) {
       await componentHandlers[interaction.customId.split(':')[0]]?.(interaction);
     }

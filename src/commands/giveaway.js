@@ -7,6 +7,9 @@ import { fail, reply } from '../utils/helpers.js';
 const MAX_DURATION = 60 * 24 * 60 * 60 * 1000;
 const idOption = (o) => o.setName('poruka_id').setDescription('ID giveaway poruke').setRequired(true);
 
+// Acknowledged right away (ephemeral) because these commands talk to Discord and can take >3 s.
+export const deferEphemeral = true;
+
 export const data = new SlashCommandBuilder()
   .setName('giveaway')
   .setDescription('Giveaway')

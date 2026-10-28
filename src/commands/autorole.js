@@ -2,6 +2,9 @@ import { InteractionContextType, PermissionFlagsBits, SlashCommandBuilder } from
 import * as db from '../db.js';
 import { fail, reply, roleProblem } from '../utils/helpers.js';
 
+// Acknowledged right away (ephemeral) because these commands talk to Discord and can take >3 s.
+export const deferEphemeral = true;
+
 export const data = new SlashCommandBuilder()
   .setName('autorole')
   .setDescription('Role koje svaki novi član dobije automatski')

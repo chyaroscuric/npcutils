@@ -1,7 +1,10 @@
-import { InteractionContextType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
+import { InteractionContextType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { computeStats, removeStats, setupStats, updateStats } from '../features/stats.js';
 import { fail } from '../utils/helpers.js';
 import * as db from '../db.js';
+
+// Acknowledged right away (ephemeral) because these commands talk to Discord and can take >3 s.
+export const deferEphemeral = true;
 
 export const data = new SlashCommandBuilder()
   .setName('stats')
@@ -18,7 +21,6 @@ export async function execute(interaction) {
   if (!guild.members.me.permissions.has(PermissionFlagsBits.ManageChannels)) {
     return fail(interaction, 'Trebam permisiju **Manage Channels**.');
   }
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   if (sub === 'setup') {
     await guild.members.fetch();

@@ -2,6 +2,9 @@ import { InteractionContextType, PermissionFlagsBits, SlashCommandBuilder } from
 import { addBonus, reset } from '../features/invites.js';
 import { reply } from '../utils/helpers.js';
 
+// Acknowledged right away (ephemeral) because these commands talk to Discord and can take >3 s.
+export const deferEphemeral = true;
+
 export const data = new SlashCommandBuilder()
   .setName('invitesadmin')
   .setDescription('Upravljanje invite-ovima')
