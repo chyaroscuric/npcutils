@@ -16,6 +16,7 @@ Custom Discord bot napravljen u [discord.js](https://discord.js.org) v14.
 | 🎵 **Glazba** | `/play` s YouTubea, SoundClouda, playliste ili pretrage; red, loop, shuffle, gumbi za kontrolu |
 | 🎮 **Igre** | Pogodi državu (zastave), Wordle, Kaladont, Ship |
 | 🔨 **Moderacija** | `/purge`, `/ban`, `/kick`, `/timeout`, `/warn`, `/lock`, `/slowmode`… s logom moderacije |
+| 📋 **Kloniranje servera** | Kopira role, kanale, dozvole, profil, emojije i postavke bota s jednog servera na drugi |
 | 🛡️ **Anti-nuke** | Kažnjava i vraća masovne banove, kickove, brisanje kanala/rola, dodavanje botova… |
 | 🌐 **Dashboard** | Web stranica s Discord prijavom — sve gore navedeno podesiš iz browsera, bez komandi |
 
@@ -125,6 +126,14 @@ Brzina: bot odmah dobije direktan link na zvuk, ne rekodira YouTubeov Opus i una
 ## 🔨 Moderacija
 
 `/purge broj [korisnik] [botovi] [sadrzi]`, `/ban`, `/unban`, `/kick`, `/timeout trajanje` (npr. `10m`, `1d`), `/untimeout`, `/warn`, `/warnings`, `/clearwarns`, `/slowmode`, `/lock`, `/unlock`. Sve akcije idu u kanal postavljen s `/modlog kanal`. Bot ne dopušta kažnjavanje vlasnika ni nekoga s jednakom ili višom rolom.
+
+## 📋 Kloniranje servera
+
+1. Na serveru s kojeg kopiraš (treba **Administrator**): `/klon izvor`
+2. Na serveru u koji kopiraš (samo **vlasnik**): `/klon cilj`
+3. Na bilo kojem od njih: `/klon pokreni [profil] [emojiji] [postavke_bota]` → bot napiše što će obrisati i napraviti, a klikom na **Obriši i kopiraj** kreće.
+
+Na ciljnom serveru se brišu svi kanali i role, pa se kopiraju role (s redoslijedom i bojama), kategorije i kanali s dozvolama (rola i članova koji su i na cilju), pravila / system kanal, po želji ime i ikona servera, emojiji i postavke ovog bota (welcome, boost, autorole, tiketi, stats, log moderacije, anti-nuke) prebačene na nove kanale i role. Poruke i članovi se ne kopiraju. Bot treba Administrator i rolu na vrhu na oba servera. Ako je komanda pokrenuta u kanalu ciljnog servera, taj se kanal na kraju obriše, a izvještaj stiže u DM.
 
 ## 🛡️ Anti-nuke
 

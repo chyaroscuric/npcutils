@@ -9,6 +9,7 @@ import * as antinuke from './features/antinuke.js';
 import * as games from './features/games/index.js';
 import { logActivity } from './features/activity.js';
 import { startDashboard } from './dashboard/server.js';
+import * as cloneCommand from './commands/clone.js';
 import * as reactionRoles from './features/reactionRoles.js';
 import { scheduleStatsUpdate } from './features/stats.js';
 import * as tickets from './features/tickets.js';
@@ -176,6 +177,7 @@ const componentHandlers = {
   giveaway: giveaways.handleComponent,
   music: music.handleComponent,
   ...games.componentHandlers,
+  clone: cloneCommand.handleComponent,
 };
 
 client.on(Events.InteractionCreate, async (interaction) => {

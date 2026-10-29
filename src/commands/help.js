@@ -24,6 +24,7 @@ export async function execute(interaction) {
         name: '🔨 Moderacija',
         value: '`/purge` • `/ban` • `/unban` • `/kick` • `/timeout` • `/untimeout` • `/warn` • `/warnings` • `/clearwarns` • `/slowmode` • `/lock` • `/unlock` • `/modlog`',
       },
+      { name: '📋 Kloniranje servera', value: '`/klon izvor` • `/klon cilj` • `/klon status` • `/klon pokreni`' },
       { name: '🛡️ Anti-nuke', value: '`/antinuke status` • `/antinuke ukljuci` • `/antinuke pravilo` • `/antinuke postavke` • `/antinuke whitelist`' },
     )
     .setFooter({ text: 'Jaankeza Utils' });
