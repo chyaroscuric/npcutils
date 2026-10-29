@@ -6,8 +6,8 @@ import test from 'node:test';
 import { AuditLogEvent, Collection } from 'discord.js';
 
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'jaankeza-antinuke-'));
-const db = await import('../src/db.mjs');
-const antinuke = await import('../src/features/antinuke.mjs');
+const db = await import('../src/db.js');
+const antinuke = await import('../src/features/antinuke.js');
 db.load();
 
 function fakeGuild() {
