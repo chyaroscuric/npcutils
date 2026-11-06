@@ -1723,73 +1723,131 @@
 
   // ---------- Stats channels ----------
   async function pageStats(ctx) {
-    ctx.head = pageHead('Statistika', 'Glasovni kanali koji prikazuju broj članova, botova i boostova.');
-    mount(ctx.el, html`${ctx.head}<div class="cols cols-wide-left">${skelCard(300)}${skelCard(200)}</div>`);
-    const g = await ctx.load(() => guildData(ctx.gid, true));
-    if (!g) return;
-    state.page.g = g;
-    state.page.ctx = ctx;
+    ctx.head = pageHead('Statistika', 'Glasovni kanali koji prikazuju broj članova, botova, boostova i pratitelja s društvenih mreža.');
+    mount(ctx.el, html`${ctx.head}<div class="cols cols-wide-left">${skelCard(420)}${skelCard(240)}</div>`);
+    const res = await ctx.load(() => Promise.all([guildData(ctx.gid, true), api('GET', g$(ctx.gid, '/stats'))]));
+    if (!res) return;
+    const [g, snapshot] = res;
+    Object.assign(state.page, { g, ctx, stats: snapshot });
     drawStats();
   }
-  function drawStats() {
-    const { g, ctx } = state.page;
-    const s = g.config.stats;
-    const rows = [['members', 'Članovi', g.memberCount], ['bots', 'Botovi', g.botCount], ['boosts', 'Boostovi', g.boostCount]];
-    mount(ctx.el, html`${ctx.head}
-      <div class="cols cols-wide-left">
-        <section class="card" aria-labelledby="st-h">
-          <div class="card-head"><div><h2 class="card-title" id="st-h">Kanali statistike</h2>
-            <p class="card-desc">${s.enabled ? 'Bot sam ažurira imena ovih kanala.' : 'Bot stvara kategoriju s tri glasovna kanala koji se sami ažuriraju.'}</p></div>
-            ${s.enabled ? html`<div class="card-actions">
-              <button type="button" class="btn" data-action="stats-remove">Ukloni kanale</button>
-              <button type="button" class="btn btn-primary" data-action="stats-create">Ponovno stvori</button></div>` : ''}
-          </div>
-          ${s.enabled
-            ? html`<ul class="plain-list">${rows.map(([k, label]) => {
-                const ch = s.channels && s.channels[k];
-                return html`<li>${icon('ti-volume', 'activity-icon')}
-                  <span class="row-main"><span class="row-title" style="display:block">${ch ? ch.name : 'Kanal nedostaje'}</span><span class="row-meta">${label}</span></span>
-                  ${ch ? idRow(ch.id, 'Kopiraj ID kanala') : html`<span class="badge badge-warning">${icon('ti-alert-triangle')}Nedostaje</span>`}</li>`;
-              })}</ul>`
-            : emptyState('ti-chart-bar', 'Kanali statistike nisu postavljeni.', html`<button type="button" class="btn btn-primary" data-action="stats-create">Stvori kanale</button>`)}
-        </section>
-        <div class="stack">
-          <aside class="callout callout-info">${icon('ti-info-circle')}
-            <div><p class="callout-title">Brojke mogu kasniti do 5 minuta</p>
-            <p class="callout-body">Discord dopušta preimenovanje kanala samo dvaput u 10 minuta, pa bot ažurira imena s odmakom.</p></div>
-          </aside>
-          <section class="card" aria-labelledby="now-h">
-            <div class="card-head"><div><h2 class="card-title" id="now-h">Trenutne brojke</h2></div></div>
-            <dl class="kv-grid">${rows.map(([, label, v]) => html`<div class="kv"><dt>${label}</dt><dd class="num">${fmtNum(v)}</dd></div>`)}</dl>
-          </section>
-        </div>
-      </div>`);
+  function statRow(def, cfg, values, g) {
+    const item = cfg.channels[def.key] || { enabled: false, template: def.defaultTemplate, account: '', channelId: null };
+    const channel = item.channelId && (g.channels.voice || []).find((c) => c.id === item.channelId);
+    const value = values[def.key];
+    const id = { tpl: uid('f'), acc: uid('f') };
+    return html`<li class="stats-item" data-stat="${def.key}">
+      <div class="stats-item-head">
+        <label class="toggle"><input type="checkbox" role="switch" name="enabled-${def.key}" ${item.enabled ? raw('checked') : ''}><span class="track" aria-hidden="true"></span>
+          <span>${def.label}${def.kind === 'social' ? html` <span class="muted">· ${def.platform}</span>` : ''}</span></label>
+        <span class="row-meta num">${channel ? `#${channel.name}` : 'kanal nije stvoren'}${value == null ? '' : ` · ${fmtNum(value)}`}</span>
+      </div>
+      <div class="field-row">
+        ${field({ name: `template-${def.key}`, label: 'Ime kanala', id: id.tpl, help: 'Koristi {count} za broj.',
+          control: html`<input class="input" id="${id.tpl}" name="template-${def.key}" maxlength="100" value="${item.template || def.defaultTemplate}" aria-describedby="${id.tpl}-help">` })}
+        ${def.kind === 'social'
+          ? field({ name: `account-${def.key}`, label: 'Račun', id: id.acc, help: 'Korisničko ime ili link.',
+              control: html`<input class="input" id="${id.acc}" name="account-${def.key}" maxlength="100" value="${item.account || ''}" placeholder="npr. ime_racuna" aria-describedby="${id.acc}-help">` })
+          : html`<div class="field"><span class="label">Izvor</span><p class="muted">Broj s ovog servera</p></div>`}
+      </div>
+    </li>`;
   }
-  actions['stats-create'] = async (btn) => {
+  function drawStats() {
+    const { g, ctx, stats } = state.page;
+    const cfg = stats.config;
+    const values = stats.values || {};
+    const defs = stats.definitions || [];
+    const catId = uid('f');
+    mount(ctx.el, html`${ctx.head}
+      <form class="form" data-form="stats" novalidate>
+        <div class="cols cols-wide-left">
+          <section class="card" aria-labelledby="st-h">
+            <div class="card-head"><div><h2 class="card-title" id="st-h">Kanali statistike</h2>
+              <p class="card-desc">Sve je prilagodljivo: ime kategorije, ime svakog kanala i računi društvenih mreža. Bot sam ažurira imena.</p></div>
+              ${statusBadge(Boolean(cfg.categoryId), 'Postavljeno', 'Nije postavljeno')}</div>
+            <div class="fields">
+              ${field({ name: 'categoryName', label: 'Ime kategorije', id: catId, help: 'Kategorija u kojoj se nalaze svi kanali statistike.',
+                control: html`<input class="input" id="${catId}" name="categoryName" maxlength="100" value="${cfg.categoryName || ''}" aria-describedby="${catId}-help">` })}
+              <div class="field">
+                <span class="label">Kanali</span>
+                <ul class="stats-list">${defs.map((def) => statRow(def, cfg, values, g))}</ul>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Spremi i primijeni</button>
+              <button type="button" class="btn" data-action="stats-refresh">Osvježi brojke</button>
+              ${cfg.categoryId ? html`<button type="button" class="btn btn-danger" data-action="stats-remove">Ukloni kanale</button>` : ''}
+            </div>
+          </section>
+          <div class="stack">
+            <aside class="callout callout-info">${icon('ti-info-circle')}
+              <div><p class="callout-title">Brojke mogu kasniti do 5 minuta</p>
+              <p class="callout-body">Discord dopušta preimenovanje kanala samo dvaput u 10 minuta, pa bot ažurira imena s odmakom. Društvene mreže se provjeravaju svakih 10 minuta.</p></div>
+            </aside>
+            <section class="card" aria-labelledby="now-h">
+              <div class="card-head"><div><h2 class="card-title" id="now-h">Trenutne brojke</h2></div></div>
+              <dl class="kv-grid">${defs.map((def) => html`<div class="kv"><dt>${def.label}</dt><dd class="num">${values[def.key] == null ? '—' : fmtNum(values[def.key])}</dd></div>`)}</dl>
+            </section>
+          </div>
+        </div>
+      </form>`);
+  }
+  forms.stats = async (f, btn) => {
+    const { g, stats } = state.page;
+    const defs = stats.definitions || [];
+    const channels = {};
+    for (const li of $$('[data-stat]', f)) {
+      const key = li.dataset.stat;
+      const def = defs.find((d) => d.key === key);
+      const item = {
+        enabled: $(`[name="enabled-${key}"]`, li).checked,
+        template: $(`[name="template-${key}"]`, li).value.trim(),
+        account: $(`[name="account-${key}"]`, li)?.value.trim() || '',
+      };
+      if (item.enabled && def?.kind === 'social' && !item.account) {
+        toast('error', 'Nedostaje račun', `Za ${def.label} upiši korisničko ime ili link.`);
+        return;
+      }
+      channels[key] = item;
+    }
+    const body = { categoryName: formValue(f, 'categoryName').trim(), channels };
+    let res;
+    const done = await run(btn, async () => { res = await api('PUT', g$(g.id, '/stats'), body); }, 'Spremanje nije uspjelo');
+    if (!done) return;
+    state.page.stats = { config: res.config, values: res.values, definitions: res.definitions || defs };
+    state.page.g = await guildData(g.id, true);
+    drawStats();
+    toast('success', 'Kanali statistike su spremljeni', 'Bot je stvorio ili preimenovao kanale prema tvojim postavkama.');
+  };
+  actions['stats-refresh'] = async (btn) => {
     const { g } = state.page;
-    const was = g.config.stats.enabled;
-    const ok = await run(btn, () => api('POST', g$(g.id, '/stats')), 'Kanali nisu stvoreni');
-    if (!ok) return;
-    toast('success', was ? 'Kanali su ponovno stvoreni' : 'Kanali statistike su stvoreni');
-    await refreshStats();
+    let res;
+    const done = await run(btn, async () => { res = await api('POST', g$(g.id, '/stats/refresh')); }, 'Osvježavanje nije uspjelo');
+    if (!done) return;
+    state.page.stats = { config: res.config, values: res.values, definitions: res.definitions };
+    state.page.g = await guildData(g.id, true);
+    drawStats();
+    toast('success', 'Brojke su osvježene');
   };
   actions['stats-remove'] = () => {
     const { g } = state.page;
     confirmAction({
       title: 'Ukloniti kanale statistike?',
-      text: 'Bot briše kategoriju i tri glasovna kanala statistike. Kasnije ih možeš ponovno stvoriti.',
+      text: 'Bot briše kategoriju i sve kanale statistike. Kasnije ih možeš ponovno stvoriti istim postavkama.',
       confirmLabel: 'Ukloni kanale',
       async onConfirm() {
         await api('DELETE', g$(g.id, '/stats'));
         toast('success', 'Kanali statistike su uklonjeni');
-        refreshStats();
+        await refreshStats();
       },
     });
   };
   async function refreshStats() {
     const { g } = state.page;
     try {
-      state.page.g = await guildData(g.id, true);
+      const [gd, snapshot] = await Promise.all([guildData(g.id, true), api('GET', g$(g.id, '/stats'))]);
+      state.page.g = gd;
+      state.page.stats = snapshot;
       if (state.page.ctx && state.page.ctx.alive()) drawStats();
     } catch (err) { reportError(err, 'Osvježavanje nije uspjelo'); }
   }

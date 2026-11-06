@@ -2,6 +2,7 @@
 // profile, emojis and this bot's settings of a source server. Messages and members are not copied.
 import { ChannelType, OverwriteType } from 'discord.js';
 import * as db from '../db.js';
+import { normalizeStatsConfig } from './stats.js';
 import { UserError } from '../utils/helpers.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -104,8 +105,13 @@ export function copyBotSettings(sourceId, targetId, roleMap, channelMap) {
   if (c.tickets && ch(c.tickets.categoryId)) {
     config.tickets = { categoryId: ch(c.tickets.categoryId), supportRoleId: role(c.tickets.supportRoleId), logChannelId: ch(c.tickets.logChannelId) };
   }
-  if (c.stats && ch(c.stats.categoryId)) {
-    config.stats = Object.fromEntries(Object.entries(c.stats).map(([k, id]) => [k, ch(id)]));
+  const stats = normalizeStatsConfig(c.stats);
+  if (stats && ch(stats.categoryId)) {
+    config.stats = {
+      ...stats,
+      categoryId: ch(stats.categoryId),
+      channels: Object.fromEntries(Object.entries(stats.channels).map(([k, item]) => [k, { ...item, channelId: ch(item.channelId) }])),
+    };
   }
   if (c.modLogChannelId) config.modLogChannelId = ch(c.modLogChannelId);
   if (c.antinuke) {

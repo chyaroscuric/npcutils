@@ -15,7 +15,7 @@ import * as botSettings from '../features/botSettings.js';
 import * as kaladont from '../features/games/kaladont.js';
 import { clearWarns } from '../features/moderation.js';
 import * as reactionRoles from '../features/reactionRoles.js';
-import { STATS, removeStats, setupStats } from '../features/stats.js';
+import { STATS, STATS_DEFINITIONS, getStatsConfig, getStatsSnapshot, removeStats, setupStats, updateStats } from '../features/stats.js';
 import { closeTicketChannel, panelPayload } from '../features/tickets.js';
 import { parseDuration } from '../utils/duration.js';
 import { UserError, roleProblem } from '../utils/helpers.js';
@@ -233,7 +233,7 @@ export function startDashboard(client, port) {
     const pick = (types) =>
       channels.filter((c) => types.includes(c.type)).map((c) => ({ id: c.id, name: c.name, parentName: c.parent?.name ?? null }));
     const bots = guild.members.cache.filter((m) => m.user.bot).size;
-    const statsCfg = g.config.stats;
+    const statsCfg = getStatsConfig(guild.id);
     res.json({
       id: guild.id,
       name: guild.name,
@@ -270,10 +270,17 @@ export function startDashboard(client, port) {
         autoroles: g.config.autoroles ?? [],
         stats: {
           enabled: Boolean(statsCfg),
+          categoryName: statsCfg?.categoryName ?? null,
           channels: Object.fromEntries(
             Object.keys(STATS).map((key) => {
-              const ch = statsCfg?.[key] && guild.channels.cache.get(statsCfg[key]);
-              return [key, ch ? { id: ch.id, name: ch.name } : null];
+              const item = statsCfg?.channels?.[key];
+              const ch = item?.channelId && guild.channels.cache.get(item.channelId);
+              return [key, {
+                enabled: Boolean(item?.enabled),
+                template: item?.template ?? STATS[key].defaultTemplate,
+                account: item?.account ?? '',
+                channel: ch ? { id: ch.id, name: ch.name } : null,
+              }];
             }),
           ),
         },
@@ -359,11 +366,35 @@ export function startDashboard(client, port) {
   });
 
   // ---------- stats ----------
+  const statsSnapshot = async (guild) => {
+    const snapshot = await getStatsSnapshot(guild);
+    return { ...snapshot, definitions: STATS_DEFINITIONS };
+  };
+  api.get('/guilds/:gid/stats', async (req, res) => {
+    res.json(await statsSnapshot(req.guild));
+  });
+  api.put('/guilds/:gid/stats', async (req, res) => {
+    if (!req.guild.members.me.permissions.has(PermissionFlagsBits.ManageChannels)) throw new UserError('Bot treba permisiju Manage Channels.');
+    const body = req.body ?? {};
+    for (const [key, def] of Object.entries(STATS)) {
+      const item = body.channels?.[key];
+      if (def.kind === 'social' && item?.enabled && !String(item.account ?? '').trim()) {
+        throw new UserError(`Upiši korisničko ime ili kanal za ${def.label}.`);
+      }
+    }
+    await req.guild.members.fetch();
+    await setupStats(req.guild, body);
+    ok(res, await statsSnapshot(req.guild));
+  });
   api.post('/guilds/:gid/stats', async (req, res) => {
     if (!req.guild.members.me.permissions.has(PermissionFlagsBits.ManageChannels)) throw new UserError('Bot treba permisiju Manage Channels.');
     await req.guild.members.fetch();
     await setupStats(req.guild);
-    ok(res);
+    ok(res, await statsSnapshot(req.guild));
+  });
+  api.post('/guilds/:gid/stats/refresh', async (req, res) => {
+    await updateStats(req.guild);
+    ok(res, await statsSnapshot(req.guild));
   });
   api.delete('/guilds/:gid/stats', async (req, res) => {
     await removeStats(req.guild);

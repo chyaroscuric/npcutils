@@ -5,7 +5,7 @@ Custom Discord bot napravljen u [discord.js](https://discord.js.org) v14.
 | Feature | Što radi |
 | --- | --- |
 | 🟢 **Uvijek aktivan** | Status se postavlja na dashboardu, auto-reconnect, ne pada na greškama, Docker / pm2 restart, keep-alive HTTP endpoint |
-| 📊 **Stats kanali** | Kanali na vrhu servera: `👥 Članovi`, `🤖 Botovi`, `🚀 Boostovi` — ažuriraju se sami |
+| 📊 **Stats kanali** | Kanali na vrhu servera: članovi, botovi, boostovi, TikTok, YouTube i Twitch — imena i računi se podešavaju na dashboardu |
 | 🎫 **Tiketi** | Panel s gumbom → privatni kanal → zatvaranje s transkriptom u log kanal |
 | 📨 **Invite counter** | Prati tko je koga pozvao (pravi / izašli / lažni / bonus), leaderboard |
 | 🏷️ **Autorole** | Svaki novi član automatski dobije npr. `Member` rolu |
@@ -114,6 +114,12 @@ Bot automatski briše poruke s linkovima i Discord pozivnicama članovima koji n
 - Svako brisanje bilježi se u kanal **Zapisnik moderacije** (postavi ga pod **Moderacija**).
 
 Sve se može podesiti i naredbom `/antilink`: `status`, `ukljuci`, `pravilo` (linkovi / pozivnice), `obavijest` te `whitelist dodaj|makni` za role i kanale.
+
+## 📊 Statistika
+
+- `/stats server` — broj članova, ljudi, botova, boostova, kanala i rola na serveru.
+- `/stats tiktok racun:` • `/stats youtube kanal:` • `/stats twitch kanal:` — pratitelji/pretplatnici za bilo koji javni račun.
+- **Stats kanali** (dashboard → **Statistika**): biraš ime kategorije, ime svakog kanala (npr. `👥 Članovi: {count}`) i za koje mreže želiš kanal. Bot sam ažurira brojeve.
 
 ## 🎵 Glazba
 

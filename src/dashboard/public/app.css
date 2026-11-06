@@ -868,6 +868,12 @@ a.np-title:hover { color: var(--accent-glow); }
 .var-list dt { font-family: var(--font-mono); font-size: 13px; color: var(--text); min-width: 112px; }
 .var-list dd { margin: 0; font-size: 13px; color: var(--text-muted); }
 
+.stats-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.stats-item { display: grid; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--hairline); }
+.stats-item:last-child { border-bottom: 0; padding-bottom: 0; }
+.stats-item-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.stats-item-head .row-meta { text-align: right; }
+
 .section-gap { margin-top: 24px; }
 .divider { border: 0; border-top: 1px solid var(--hairline); margin: 24px 0; }
 

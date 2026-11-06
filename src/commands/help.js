@@ -11,7 +11,7 @@ export async function execute(interaction) {
     .setTitle(`🤖 ${botName} — komande`)
     .setThumbnail(interaction.client.user.displayAvatarURL())
     .addFields(
-      { name: '📊 Statistika', value: '`/stats setup` • `/stats refresh` • `/stats remove`' },
+      { name: '📊 Statistika', value: '`/stats server` • `/stats tiktok` • `/stats youtube` • `/stats twitch` • `/stats setup` • `/stats refresh` • `/stats remove`' },
       { name: '🎫 Tiketi', value: '`/ticket setup` • `/ticket panel` • `/ticket close` • `/ticket add` • `/ticket remove`' },
       { name: '📨 Invite counter', value: '`/invites` • `/leaderboard` • `/invitesadmin bonus` • `/invitesadmin reset`' },
       { name: '👋 Welcome', value: '`/welcome set` • `/welcome test` • `/welcome off`' },
