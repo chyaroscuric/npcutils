@@ -56,6 +56,19 @@ test('anti-link is on by default and detects invites and links', () => {
   assert.equal(antilink.findBlocked({ ...message, content: 'bez linka, samo tekst' }), null);
 });
 
+test('obfuscated links are still detected', () => {
+  const { message } = fakeMessage('');
+  for (const content of [
+    'discord . gg / abc123',
+    'discord[.]gg/abc123',
+    'pogledaj example (dot) com',
+    'hxxps://example.com',
+    'example\u200B.com',
+  ]) {
+    assert.ok(antilink.findBlocked({ ...message, content }), content);
+  }
+});
+
 test('config is validated', () => {
   const cfg = antilink.saveConfig('g1', { enabled: false, blockLinks: false, whitelistRoles: ['r1', 'r1'], whitelistChannels: ['c1'] });
   assert.equal(cfg.enabled, false);

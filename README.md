@@ -107,8 +107,11 @@ Na dashboardu vidiš servere na kojima je bot i na kojima si **vlasnik** ili te 
 Bot automatski briše poruke s linkovima i Discord pozivnicama članovima koji nisu moderatori. Vlasnik, bot i članovi s dozvolama **Manage Messages**, **Manage Server**, **Ban**, **Kick**, **Timeout** ili **Administrator** su izuzeti, kao i role i kanali koje dodaš pod **Zaštita od linkova** na dashboardu.
 
 - Uključeno je po defaultu za nove i postojeće servere; možeš isključiti ili odabrati samo pozivnice ili samo obične linkove.
+- Prepoznaje i skrivene linkove: razmake oko točke, `[.]`, `(dot)`, `hxxp://` i nevidljive znakove.
 - Bot može poslati kratku poruku objašnjenja koja se sama obriše nakon nekoliko sekundi.
 - Svako brisanje bilježi se u kanal **Zapisnik moderacije** (postavi ga pod **Moderacija**).
+
+Sve se može podesiti i naredbom `/antilink`: `status`, `ukljuci`, `pravilo` (linkovi / pozivnice), `obavijest` te `whitelist dodaj|makni` za role i kanale.
 
 ## 🎵 Glazba
 

@@ -26,6 +26,7 @@ export async function execute(interaction) {
       },
       { name: '📋 Kloniranje servera', value: '`/klon izvor` • `/klon cilj` • `/klon status` • `/klon pokreni`' },
       { name: '🛡️ Anti-nuke', value: '`/antinuke status` • `/antinuke ukljuci` • `/antinuke pravilo` • `/antinuke postavke` • `/antinuke whitelist`' },
+      { name: '🔗 Zaštita od linkova', value: '`/antilink status` • `/antilink ukljuci` • `/antilink pravilo` • `/antilink obavijest` • `/antilink whitelist`' },
     )
     .setFooter({ text: 'Jaankeza Utils' });
   if (process.env.DASHBOARD_URL && process.env.CLIENT_SECRET) {

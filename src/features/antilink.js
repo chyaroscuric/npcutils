@@ -49,10 +49,22 @@ export function saveConfig(guildId, input) {
   return next;
 }
 
+// Catches the usual tricks for hiding a link: "example [.] com", "discord dot gg",
+// zero-width characters, "hxxp://", spaces around dots and slashes.
+export function normalizeContent(text) {
+  return String(text ?? '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s*[\[({]\s*(?:\.|dot|tačka|tacka|točka|tocka)\s*[\])}]\s*/gi, '.')
+    .replace(/\s+(?:dot|tačka|tacka|točka|tocka)\s+/gi, '.')
+    .replace(/\bhxxps?\b/gi, (m) => m.toLowerCase().replace('hxxp', 'http'))
+    .replace(/\s*\.\s*/g, '.')
+    .replace(/\s*\/\s*/g, '/');
+}
+
 // Which rule the message breaks, or null when it is allowed.
 export function findBlocked(message, cfg = getConfig(message.guild.id)) {
   if (!cfg.enabled) return null;
-  const content = message.content ?? '';
+  const content = normalizeContent(message.content);
   if (!content) return null;
   if (cfg.blockInvites && INVITE_RE.test(content)) return 'invite';
   if (cfg.blockLinks && LINK_RE.test(content)) return 'link';
