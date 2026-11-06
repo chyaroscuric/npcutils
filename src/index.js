@@ -8,6 +8,8 @@ import * as music from './features/music.js';
 import * as antinuke from './features/antinuke.js';
 import * as antilink from './features/antilink.js';
 import * as botSettings from './features/botSettings.js';
+import * as counting from './features/counting.js';
+import * as levels from './features/levels.js';
 import * as games from './features/games/index.js';
 import { logActivity } from './features/activity.js';
 import { startDashboard } from './dashboard/server.js';
@@ -86,6 +88,7 @@ client.once(Events.ClientReady, async () => {
 
   for (const guild of client.guilds.cache.values()) await prepareGuild(guild);
   giveaways.start(client);
+  levels.start(client);
   music.checkSetup();
   games.startGames();
 
@@ -154,7 +157,11 @@ client.on(
     if (!message.inGuild() || message.author.id === client.user.id) return;
     const deleted = await antilink.onMessage(message);
     await antinuke.onMessage(message);
-    if (!deleted && !message.author.bot) await games.onMessage(message);
+    const counted = await counting.onMessage(message);
+    if (!deleted && !counted) {
+      await levels.onMessage(message);
+      if (!message.author.bot) await games.onMessage(message);
+    }
   }),
 );
 client.on(
@@ -164,7 +171,13 @@ client.on(
     giveaways.onMessageDelete(message);
   }),
 );
-client.on(Events.VoiceStateUpdate, safe('voiceState', music.onVoiceStateUpdate));
+client.on(
+  Events.VoiceStateUpdate,
+  safe('voiceState', async (oldState, newState) => {
+    levels.onVoiceStateUpdate(oldState, newState);
+    await music.onVoiceStateUpdate(oldState, newState);
+  }),
+);
 client.on(Events.MessageReactionAdd, safe('reactionAdd', reactionRoles.onReactionAdd));
 client.on(Events.MessageReactionRemove, safe('reactionRemove', reactionRoles.onReactionRemove));
 
@@ -212,6 +225,7 @@ process.on('uncaughtException', (err) => {
 
 function shutdown(code = 0) {
   try {
+    levels.stop();
     db.flush();
   } catch (err) {
     console.error('[db]', err);

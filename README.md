@@ -15,6 +15,8 @@ Custom Discord bot napravljen u [discord.js](https://discord.js.org) v14.
 | 🎉 **Giveaway** | Giveaway s gumbom za prijavu, automatsko izvlačenje, reroll |
 | 🎵 **Glazba** | `/play` s YouTubea, SoundClouda, playliste ili pretrage; red, loop, shuffle, gumbi za kontrolu |
 | 🎮 **Igre** | Pogodi državu (zastave), Wordle, Kaladont, Ship |
+| 🔢 **Brojanje** | Članovi redom pišu 1, 2, 3…; pogrešan broj resetira niz i bot javi gdje je pukao |
+| 📈 **Leveli** | XP iz poruka i vremena u voice kanalu, `/rank` i `/top` rang liste |
 | 🔨 **Moderacija** | `/purge`, `/ban`, `/kick`, `/timeout`, `/warn`, `/lock`, `/slowmode`… s logom moderacije |
 | 📋 **Kloniranje servera** | Kopira role, kanale, dozvole, profil, emojije i postavke bota s jednog servera na drugi |
 | 🛡️ **Anti-nuke** | Kažnjava i vraća masovne banove, kickove, brisanje kanala/rola, dodavanje botova… |
@@ -114,6 +116,17 @@ Bot automatski briše poruke s linkovima i Discord pozivnicama članovima koji n
 - Svako brisanje bilježi se u kanal **Zapisnik moderacije** (postavi ga pod **Moderacija**).
 
 Sve se može podesiti i naredbom `/antilink`: `status`, `ukljuci`, `pravilo` (linkovi / pozivnice), `obavijest` te `whitelist dodaj|makni` za role i kanale.
+
+## 🔢 Brojanje
+
+`/counting setup kanal:#kanal` uključi igru, `/counting status` pokaže trenutni broj i rekord, `/counting reset` vraća na 1, a `/counting off` isključuje. Postavke su i na dashboardu pod **Brojanje**.
+
+## 📈 Leveli
+
+- `/rank [korisnik]` — level, XP, rang, broj poruka i vrijeme u voice kanalu.
+- `/top [vrsta] [broj]` — TOP TEXT i TOP VOICE rang liste.
+- `/levels status|ukljuci|postavke|reset` — XP po poruci, XP po minuti u voiceu, cooldown i obavijest o novom levelu.
+- Sve se može podesiti i na dashboardu pod **Leveli**.
 
 ## 📊 Statistika
 

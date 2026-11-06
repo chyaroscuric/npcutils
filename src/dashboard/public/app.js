@@ -914,6 +914,8 @@
       { key: 'giveaways', label: 'Giveaway', icon: 'ti-gift' },
       { key: 'music', label: 'Glazba', icon: 'ti-music' },
       { key: 'games', label: 'Igre', icon: 'ti-device-gamepad-2' },
+      { key: 'counting', label: 'Brojanje', icon: 'ti-hash' },
+      { key: 'levels', label: 'Leveli', icon: 'ti-chart-line' },
     ] },
   ];
   const PAGE_KEYS = NAV.flatMap((g) => g.items.map((i) => i.key));
@@ -1441,6 +1443,8 @@
       { page: 'antilink', name: 'Zaštita od linkova', on: !!(c.antilink && c.antilink.enabled), meta: c.antilink && c.antilink.enabled ? 'Linkovi i pozivnice se brišu članovima' : 'Članovi mogu slati linkove' },
       { page: 'moderation', name: 'Zapisnik moderacije', on: !!c.modLogChannelId, meta: c.modLogChannelId ? chan(c.modLogChannelId) : 'Moderatorske radnje se ne bilježe' },
       { page: 'games', name: 'Kaladont', on: (c.kaladontCount || 0) > 0, meta: c.kaladontCount ? `Igra se u ${count(c.kaladontCount, 'kanalu', 'kanala', 'kanala')}` : 'Ne igra se ni u jednom kanalu' },
+      { page: 'counting', name: 'Brojanje', on: !!(c.counting && c.counting.enabled), meta: c.counting && c.counting.enabled ? `Trenutni broj: ${fmtNum(c.counting.current || 0)}` : 'Igra brojanja je isključena' },
+      { page: 'levels', name: 'Leveli', on: !!(c.levels && c.levels.enabled), meta: c.levels && c.levels.enabled ? 'Broje se poruke i voice vrijeme' : 'Leveli su isključeni' },
     ];
     const activity = g.activity || [];
     const showAll = state.page.showAllActivity;
@@ -3442,6 +3446,189 @@
     });
   };
 
+  // ---------- Counting ----------
+  async function pageCounting(ctx) {
+    ctx.head = pageHead('Brojanje', 'Članovi redom pišu 1, 2, 3… u jednom kanalu. Pogrešan broj vraća sve na 1.');
+    mount(ctx.el, html`${ctx.head}<div class="cols cols-form-right">${skelCard(320)}${skelCard(220)}</div>`);
+    const res = await ctx.load(() => Promise.all([guildData(ctx.gid), api('GET', g$(ctx.gid, '/counting'))]));
+    if (!res) return;
+    const [g, counting] = res;
+    Object.assign(state.page, { g, ctx, counting });
+    drawCounting();
+  }
+  function drawCounting() {
+    const { g, ctx, counting } = state.page;
+    const id = uid('f');
+    mount(ctx.el, html`${ctx.head}
+      <div class="cols cols-form-right">
+        <section class="card" aria-labelledby="co-h">
+          <div class="card-head"><div><h2 class="card-title" id="co-h">Kanal za brojanje</h2>
+            <p class="card-desc">Samo brojevi se računaju. Pogrešan broj briše trenutni niz i počinje od 1.</p></div>
+            ${statusBadge(counting.enabled)}</div>
+          <form class="form" data-form="counting" novalidate>
+            <div class="fields">
+              ${field({ name: 'channelId', label: 'Kanal', id, required: true,
+                control: selectField({ id, name: 'channelId', options: textChannelOptions(g), value: counting.channelId || '', placeholder: 'Odaberi kanal', emptyText: 'Server nema tekstualnih kanala.' }) })}
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">${counting.enabled ? 'Spremi kanal' : 'Uključi brojanje'}</button>
+              ${counting.enabled ? html`<button type="button" class="btn" data-action="counting-reset">Resetiraj na 1</button><button type="button" class="btn btn-danger" data-action="counting-off">Isključi</button>` : ''}
+            </div>
+          </form>
+        </section>
+        <div class="stack">
+          <section class="card" aria-labelledby="co-s-h">
+            <div class="card-head"><div><h2 class="card-title" id="co-s-h">Stanje</h2></div></div>
+            <dl class="kv-grid">
+              <div class="kv"><dt>Trenutni broj</dt><dd class="num">${fmtNum(counting.current || 0)}</dd></div>
+              <div class="kv"><dt>Sljedeći broj</dt><dd class="num">${fmtNum((counting.current || 0) + 1)}</dd></div>
+              <div class="kv"><dt>Rekord</dt><dd class="num">${fmtNum(counting.best || 0)}</dd></div>
+              <div class="kv"><dt>Kanal</dt><dd>${counting.channelName ? `#${counting.channelName}` : 'nije odabran'}</dd></div>
+            </dl>
+          </section>
+          <aside class="callout callout-info">${icon('ti-info-circle')}
+            <div><p class="callout-title">Kako radi</p><p class="callout-body">Bot potvrdi točan broj s ✅. Kad netko pogriješi, javi na kojem je broju niz pukao i resetira ga na 1.</p></div>
+          </aside>
+        </div>
+      </div>`);
+  }
+  forms.counting = async (f, btn) => {
+    const { g } = state.page;
+    const channelId = formValue(f, 'channelId');
+    if (!channelId) return fieldError(f, 'channelId', 'Odaberi kanal za brojanje.');
+    let res;
+    const done = await run(btn, async () => { res = await api('PUT', g$(g.id, '/counting'), { channelId }); }, 'Spremanje nije uspjelo');
+    if (!done) return;
+    state.page.counting = res;
+    invalidateGuild(g.id);
+    drawCounting();
+    toast('success', 'Brojanje je uključeno', 'Sljedeći broj je 1.');
+  };
+  actions['counting-reset'] = async (btn) => {
+    const { g } = state.page;
+    let res;
+    const done = await run(btn, async () => { res = await api('POST', g$(g.id, '/counting/reset')); }, 'Reset nije uspio');
+    if (!done) return;
+    state.page.counting = { ...state.page.counting, current: res.current, best: res.best };
+    drawCounting();
+    toast('success', 'Brojanje je resetirano', 'Sljedeći broj je 1.');
+  };
+  actions['counting-off'] = () => {
+    const { g } = state.page;
+    confirmAction({
+      title: 'Isključiti brojanje?',
+      text: 'Bot prestaje pratiti brojeve u kanalu. Trenutni niz se briše.',
+      confirmLabel: 'Isključi',
+      async onConfirm() {
+        await api('DELETE', g$(g.id, '/counting'));
+        state.page.counting = { enabled: false, channelId: null, channelName: null, current: 0, best: state.page.counting.best || 0 };
+        invalidateGuild(g.id);
+        drawCounting();
+        toast('success', 'Brojanje je isključeno');
+      },
+    });
+  };
+
+  // ---------- Levels ----------
+  async function pageLevels(ctx) {
+    ctx.head = pageHead('Leveli', 'XP iz poruka i vremena u voice kanalu, s rang listom kao na popularnim level botovima.');
+    mount(ctx.el, html`${ctx.head}<div class="cols cols-form-right"><div class="stack">${skelCard(360)}${skelCard(360)}</div><div class="stack">${skelCard(300)}</div></div>`);
+    const res = await ctx.load(() => Promise.all([guildData(ctx.gid), api('GET', g$(ctx.gid, '/levels'))]));
+    if (!res) return;
+    const [g, levels] = res;
+    Object.assign(state.page, { g, ctx, levels });
+    drawLevels();
+  }
+  function levelTopList(entries, value) {
+    if (!entries.length) return emptyState('ti-chart-line', 'Još nema podataka. Poruke i voice vrijeme se broje automatski.');
+    return html`<ul class="plain-list">${entries.map((u, i) => html`<li>
+      <span class="num muted" style="min-width:32px">#${i + 1}</span>
+      ${avatar(u.user.avatarUrl, u.user.name, 'avatar-sm')}
+      <span class="row-main"><span class="row-title truncate" style="display:block">${u.user.name}</span>
+        <span class="row-meta num">${value === 'voice' ? fmtDur(u.voiceMs) : count(u.messages, 'poruka', 'poruke', 'poruka')} · level ${u.level}</span></span>
+    </li>`)}</ul>`;
+  }
+  function drawLevels() {
+    const { g, ctx, levels } = state.page;
+    const c = levels.config;
+    const id = { msg: uid('f'), voice: uid('f'), cd: uid('f') };
+    mount(ctx.el, html`${ctx.head}
+      <div class="cols cols-form-right">
+        <div class="stack">
+          <section class="card" aria-labelledby="lv-h">
+            <div class="card-head"><div><h2 class="card-title" id="lv-h">Postavke levela</h2>
+              <p class="card-desc">Level se računa iz ukupnog XP-a. Poruke imaju cooldown da se ne može spamati.</p></div>
+              ${statusBadge(c.enabled)}</div>
+            <form class="form" data-form="levels" novalidate>
+              <div class="fields">
+                <label class="toggle"><input type="checkbox" role="switch" name="enabled" ${c.enabled ? raw('checked') : ''}><span class="track" aria-hidden="true"></span><span>Uključi levele</span></label>
+                <label class="toggle"><input type="checkbox" role="switch" name="announce" ${c.announce ? raw('checked') : ''}><span class="track" aria-hidden="true"></span><span>Objavi kad netko dosegne novi level</span></label>
+                <div class="field-row">
+                  ${field({ name: 'xpPerMessage', label: 'XP po poruci', id: id.msg, help: '1–100.',
+                    control: html`<input class="input" id="${id.msg}" name="xpPerMessage" type="number" min="1" max="100" value="${c.xpPerMessage}" aria-describedby="${id.msg}-help">` })}
+                  ${field({ name: 'xpPerMinuteVoice', label: 'XP po minuti u voiceu', id: id.voice, help: '0–100.',
+                    control: html`<input class="input" id="${id.voice}" name="xpPerMinuteVoice" type="number" min="0" max="100" value="${c.xpPerMinuteVoice}" aria-describedby="${id.voice}-help">` })}
+                  ${field({ name: 'cooldownSec', label: 'Cooldown (sekunde)', id: id.cd, help: '0–3600.',
+                    control: html`<input class="input" id="${id.cd}" name="cooldownSec" type="number" min="0" max="3600" value="${c.cooldownSec}" aria-describedby="${id.cd}-help">` })}
+                </div>
+              </div>
+              <div class="form-actions"><button type="submit" class="btn btn-primary">Spremi postavke</button><button type="button" class="btn btn-danger" data-action="levels-reset">Resetiraj sve</button></div>
+            </form>
+          </section>
+          <section class="card" aria-labelledby="lv-t-h">
+            <div class="card-head"><div><h2 class="card-title" id="lv-t-h">TOP TEXT</h2><p class="card-desc">Najviše poruka.</p></div></div>
+            ${levelTopList(levels.top.text, 'messages')}
+          </section>
+          <section class="card" aria-labelledby="lv-v-h">
+            <div class="card-head"><div><h2 class="card-title" id="lv-v-h">TOP VOICE</h2><p class="card-desc">Najviše vremena u voice kanalima.</p></div></div>
+            ${levelTopList(levels.top.voice, 'voice')}
+          </section>
+        </div>
+        <aside class="stack">
+          <section class="card" aria-labelledby="lv-i-h">
+            <div class="card-head"><div><h2 class="card-title" id="lv-i-h">Kako radi</h2></div></div>
+            <ul class="plain-list">
+              <li>${icon('ti-message')}<span class="row-main">Svaka poruka broji se u TOP TEXT, a XP dobivaš uz cooldown.</span></li>
+              <li>${icon('ti-microphone')}<span class="row-main">Vrijeme u voice kanalu pretvara se u XP po minuti.</span></li>
+              <li>${icon('ti-trophy')}<span class="row-main">\`/rank\` prikazuje tvoj level i rang, a \`/top\` rang listu.</span></li>
+            </ul>
+          </section>
+        </aside>
+      </div>`);
+  }
+  forms.levels = async (f, btn) => {
+    const { g } = state.page;
+    const body = {
+      enabled: f.elements.enabled.checked,
+      announce: f.elements.announce.checked,
+      xpPerMessage: Number(formValue(f, 'xpPerMessage')),
+      xpPerMinuteVoice: Number(formValue(f, 'xpPerMinuteVoice')),
+      cooldownSec: Number(formValue(f, 'cooldownSec')),
+    };
+    let res;
+    const done = await run(btn, async () => { res = await api('PUT', g$(g.id, '/levels'), body); }, 'Spremanje nije uspjelo');
+    if (!done) return;
+    state.page.levels.config = res.config;
+    invalidateGuild(g.id);
+    drawLevels();
+    toast('success', 'Postavke levela su spremljene');
+  };
+  actions['levels-reset'] = () => {
+    const { g } = state.page;
+    confirmAction({
+      title: 'Resetirati svu statistiku levela?',
+      text: 'Brišu se poruke, voice vrijeme i XP svih članova. Ovo se ne može poništiti.',
+      confirmLabel: 'Resetiraj sve',
+      async onConfirm() {
+        await api('DELETE', g$(g.id, '/levels'));
+        const levels = await api('GET', g$(g.id, '/levels'));
+        state.page.levels = levels;
+        drawLevels();
+        toast('success', 'Statistika levela je resetirana');
+      },
+    });
+  };
+
   const PAGES = {
     overview: pageOverview,
     access: pageAccess,
@@ -3456,6 +3643,8 @@
     antilink: pageAntiLink,
     moderation: pageModeration,
     games: pageGames,
+    counting: pageCounting,
+    levels: pageLevels,
   };
 
   /* =====================================================================

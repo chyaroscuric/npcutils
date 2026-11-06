@@ -12,6 +12,8 @@ import * as music from '../features/music.js';
 import * as antinuke from '../features/antinuke.js';
 import * as antilink from '../features/antilink.js';
 import * as botSettings from '../features/botSettings.js';
+import * as counting from '../features/counting.js';
+import * as levels from '../features/levels.js';
 import * as kaladont from '../features/games/kaladont.js';
 import { clearWarns } from '../features/moderation.js';
 import * as reactionRoles from '../features/reactionRoles.js';
@@ -295,6 +297,11 @@ export function startDashboard(client, port) {
         antilink: { enabled: antilink.getConfig(guild.id).enabled },
         modLogChannelId: g.config.modLogChannelId ?? null,
         kaladontCount: kaladont.activeGames(guild.id).length,
+        counting: (() => {
+          const c = counting.getConfig(guild.id);
+          return c ? { enabled: true, channelId: c.channelId, current: c.current ?? 0, best: c.best ?? 0 } : { enabled: false };
+        })(),
+        levels: { enabled: levels.getConfig(guild.id).enabled },
       },
       activity: recentActivity(guild.id),
     });
@@ -398,6 +405,54 @@ export function startDashboard(client, port) {
   });
   api.delete('/guilds/:gid/stats', async (req, res) => {
     await removeStats(req.guild);
+    ok(res);
+  });
+
+  // ---------- counting ----------
+  api.get('/guilds/:gid/counting', (req, res) => {
+    const cfg = counting.getConfig(req.guild.id);
+    const channel = cfg && req.guild.channels.cache.get(cfg.channelId);
+    res.json({
+      enabled: Boolean(cfg),
+      channelId: cfg?.channelId ?? null,
+      channelName: channel?.name ?? null,
+      current: cfg?.current ?? 0,
+      best: cfg?.best ?? 0,
+    });
+  });
+  api.put('/guilds/:gid/counting', (req, res) => {
+    const channel = textChannel(req.guild, req.body?.channelId);
+    const cfg = counting.setup(req.guild.id, channel.id);
+    ok(res, { enabled: true, channelId: cfg.channelId, channelName: channel.name, current: cfg.current, best: cfg.best });
+  });
+  api.post('/guilds/:gid/counting/reset', (req, res) => {
+    const cfg = counting.reset(req.guild.id);
+    if (!cfg) throw new UserError('Brojanje nije uključeno.');
+    ok(res, { current: cfg.current, best: cfg.best });
+  });
+  api.delete('/guilds/:gid/counting', (req, res) => {
+    counting.disable(req.guild.id);
+    ok(res);
+  });
+
+  // ---------- levels ----------
+  const levelsPayload = (guild) => {
+    const cfg = levels.getConfig(guild.id);
+    const top = levels.top(guild.id, 10);
+    const decorate = (list) => list.map((u) => ({ ...u, user: userInfo(guild, u.userId) }));
+    return { config: cfg, top: { text: decorate(top.text), voice: decorate(top.voice) } };
+  };
+  api.get('/guilds/:gid/levels', (req, res) => {
+    res.json(levelsPayload(req.guild));
+  });
+  api.put('/guilds/:gid/levels', (req, res) => {
+    ok(res, { config: levels.saveConfig(req.guild.id, req.body ?? {}) });
+  });
+  api.delete('/guilds/:gid/levels/:userId', (req, res) => {
+    ok(res, { removed: levels.resetUser(req.guild.id, req.params.userId) });
+  });
+  api.delete('/guilds/:gid/levels', (req, res) => {
+    levels.resetAll(req.guild.id);
     ok(res);
   });
 
