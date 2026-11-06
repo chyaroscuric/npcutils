@@ -127,7 +127,14 @@ export function startDashboard(client, port) {
     res.redirect('/');
   });
 
-  app.use(express.static(fileURLToPath(new URL('./public/', import.meta.url)), { index: 'index.html', maxAge: '1h' }));
+  // Dashboard files change together with the bot, so let the browser revalidate them
+  // instead of keeping an old app.js for an hour.
+  app.use(express.static(fileURLToPath(new URL('./public/', import.meta.url)), {
+    index: 'index.html',
+    maxAge: 0,
+    etag: true,
+    setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache'),
+  }));
 
   // ---------- API ----------
   const api = express.Router();

@@ -1475,6 +1475,7 @@
             </dl>
             <dl class="kv section-gap"><dt>ID servera</dt><dd>${idRow(g.id, 'Kopiraj ID servera')}</dd></dl>
           </section>
+          ${botStatusCard(state.me.bot)}
         </div>
         <section class="card" aria-labelledby="act-h">
           <div class="card-head"><div><h2 class="card-title" id="act-h">Nedavna aktivnost</h2></div>

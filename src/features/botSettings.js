@@ -60,9 +60,12 @@ export async function applyStatus(client) {
   if (!client.user) return;
   const { status } = getSettings();
   const activities = status.text ? [activityFor(status)] : [];
-  await client.user.setPresence({ status: status.state, activities }).catch((err) => {
+  try {
+    // discord.js setPresence() is synchronous and returns void.
+    client.user.setPresence({ status: status.state, activities });
+  } catch (err) {
     console.warn('[status] Ne mogu postaviti status:', err.message);
-  });
+  }
 }
 
 // The bot owner (or every member of the owning team) may change global settings.
