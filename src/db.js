@@ -21,6 +21,7 @@ export function load() {
 export function guild(guildId) {
   const g = (data.guilds[guildId] ??= {});
   g.config ??= {};
+  g.config.dashboardUsers ??= []; // userIds the owner allowed into the dashboard
   g.invites ??= {}; // inviterId -> { regular, left, fake, bonus }
   g.joins ??= {}; // memberId -> { inviterId, code, fake, at }
   g.tickets ??= { counter: 0, open: {} }; // open: channelId -> { ownerId, number, createdAt }

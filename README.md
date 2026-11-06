@@ -18,6 +18,7 @@ Custom Discord bot napravljen u [discord.js](https://discord.js.org) v14.
 | 🔨 **Moderacija** | `/purge`, `/ban`, `/kick`, `/timeout`, `/warn`, `/lock`, `/slowmode`… s logom moderacije |
 | 📋 **Kloniranje servera** | Kopira role, kanale, dozvole, profil, emojije i postavke bota s jednog servera na drugi |
 | 🛡️ **Anti-nuke** | Kažnjava i vraća masovne banove, kickove, brisanje kanala/rola, dodavanje botova… |
+| 🔗 **Zaštita od linkova** | Briše poruke s linkovima i Discord pozivnicama članovima bez moderatorskih dozvola. |
 | 🌐 **Dashboard** | Web stranica s Discord prijavom — sve gore navedeno podesiš iz browsera, bez komandi |
 
 ---
@@ -97,9 +98,17 @@ Dashboard je web stranica na kojoj se prijaviš Discordom i podesiš sve bez kom
 2. U Developer Portalu → OAuth2 → Redirects dodaj `DASHBOARD_URL` + `/callback`.
 3. Pokreni bota i otvori `DASHBOARD_URL`.
 
-Vidiš samo servere na kojima je bot i na kojima imaš permisiju **Manage Server**. Boju sučelja mijenjaš pod **Izgled** (dolje lijevo).
+Na dashboardu vidiš servere na kojima je bot i na kojima si **vlasnik** ili te je vlasnik dodao pod **Pristup dashboardu**. Obični admini bez tog dodatka ne mogu otvoriti postavke servera. Vlasnik uvijek ima pristup i može dodati ili ukloniti članove; pristup prestaje odmah nakon uklanjanja. Boju sučelja mijenjaš pod **Izgled** (dolje lijevo).
 
 > Ako dashboard ide na internet, stavi ga iza HTTPS-a (npr. Cloudflare Tunnel ili nginx) i u `DASHBOARD_URL` upiši `https://...`.
+
+## 🔗 Zaštita od linkova
+
+Bot automatski briše poruke s linkovima i Discord pozivnicama članovima koji nisu moderatori. Vlasnik, bot i članovi s dozvolama **Manage Messages**, **Manage Server**, **Ban**, **Kick**, **Timeout** ili **Administrator** su izuzeti, kao i role i kanali koje dodaš pod **Zaštita od linkova** na dashboardu.
+
+- Uključeno je po defaultu za nove i postojeće servere; možeš isključiti ili odabrati samo pozivnice ili samo obične linkove.
+- Bot može poslati kratku poruku objašnjenja koja se sama obriše nakon nekoliko sekundi.
+- Svako brisanje bilježi se u kanal **Zapisnik moderacije** (postavi ga pod **Moderacija**).
 
 ## 🎵 Glazba
 

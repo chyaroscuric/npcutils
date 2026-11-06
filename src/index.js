@@ -6,6 +6,7 @@ import * as invites from './features/invites.js';
 import * as members from './features/members.js';
 import * as music from './features/music.js';
 import * as antinuke from './features/antinuke.js';
+import * as antilink from './features/antilink.js';
 import * as games from './features/games/index.js';
 import { logActivity } from './features/activity.js';
 import { startDashboard } from './dashboard/server.js';
@@ -157,8 +158,9 @@ client.on(
   Events.MessageCreate,
   safe('messageCreate', async (message) => {
     if (!message.inGuild() || message.author.id === client.user.id) return;
+    const deleted = await antilink.onMessage(message);
     await antinuke.onMessage(message);
-    if (!message.author.bot) await games.onMessage(message);
+    if (!deleted && !message.author.bot) await games.onMessage(message);
   }),
 );
 client.on(

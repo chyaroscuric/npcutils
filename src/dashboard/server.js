@@ -10,6 +10,7 @@ import * as invites from '../features/invites.js';
 import { DEFAULT_BOOST, DEFAULT_WELCOME, boostPayload, welcomePayload } from '../features/members.js';
 import * as music from '../features/music.js';
 import * as antinuke from '../features/antinuke.js';
+import * as antilink from '../features/antilink.js';
 import * as kaladont from '../features/games/kaladont.js';
 import { clearWarns } from '../features/moderation.js';
 import * as reactionRoles from '../features/reactionRoles.js';
@@ -141,14 +142,19 @@ export function startDashboard(client, port) {
     next();
   });
 
-  const manageableGuilds = (userId) =>
-    client.guilds.cache.filter((g) => g.members.cache.get(userId)?.permissions.has(PermissionFlagsBits.ManageGuild));
+  // The owner always has access; everyone else must be added by the owner on the dashboard.
+  const isDashboardUser = (guild, userId) =>
+    guild.ownerId === userId || db.guild(guild.id).config.dashboardUsers.includes(userId);
+  const hasDashboardAccess = (guild, userId) =>
+    guild.ownerId === userId || (isDashboardUser(guild, userId) && guild.members.cache.has(userId));
+
+  const manageableGuilds = (userId) => client.guilds.cache.filter((g) => isDashboardUser(g, userId));
 
   api.get('/me', async (req, res) => {
     const user = await client.users.fetch(req.userId);
     res.json({
       user: { id: user.id, username: user.username, displayName: user.globalName ?? user.username, avatarUrl: avatarOf(user) },
-      guilds: manageableGuilds(req.userId).map((g) => ({ id: g.id, name: g.name, iconUrl: g.iconURL({ size: 128 }), memberCount: g.memberCount })),
+      guilds: manageableGuilds(req.userId).map((g) => ({ id: g.id, name: g.name, iconUrl: g.iconURL({ size: 128 }), memberCount: g.memberCount, isOwner: g.ownerId === req.userId })),
       bot: {
         id: client.user.id,
         name: client.user.username,
@@ -160,12 +166,13 @@ export function startDashboard(client, port) {
     });
   });
 
-  // every /guilds/:gid route: the user must have Manage Server on that server right now
+  // every /guilds/:gid route: owner, or a member the owner explicitly added to the dashboard
   api.param('gid', async (req, res, next, gid) => {
     const guild = client.guilds.cache.get(gid);
-    const member = guild && (guild.members.cache.get(req.userId) ?? (await guild.members.fetch(req.userId).catch(() => null)));
-    if (!member?.permissions.has(PermissionFlagsBits.ManageGuild)) {
-      return res.status(403).json({ error: 'Nemaš pristup ovom serveru.' });
+    if (!guild) return res.status(403).json({ error: 'Nemaš pristup ovom serveru.' });
+    const member = guild.members.cache.get(req.userId) ?? (await guild.members.fetch(req.userId).catch(() => null));
+    if (!member || !hasDashboardAccess(guild, req.userId)) {
+      return res.status(403).json({ error: 'Nemaš pristup ovom serveru. Vlasnik servera te mora dodati na dashboard.' });
     }
     req.guild = guild;
     req.member = member;
@@ -237,11 +244,38 @@ export function startDashboard(client, port) {
           openCount: Object.keys(g.tickets.open).length,
         },
         antinuke: { enabled: antinuke.getConfig(guild.id).enabled },
+        antilink: { enabled: antilink.getConfig(guild.id).enabled },
         modLogChannelId: g.config.modLogChannelId ?? null,
         kaladontCount: kaladont.activeGames(guild.id).length,
       },
       activity: recentActivity(guild.id),
     });
+  });
+
+  // ---------- dashboard access ----------
+  api.get('/guilds/:gid/access', (req, res) => {
+    const ids = req.g.config.dashboardUsers.filter((id) => id !== req.guild.ownerId);
+    res.json({
+      canEdit: req.guild.ownerId === req.userId,
+      owner: userInfo(req.guild, req.guild.ownerId),
+      users: ids.map((id) => userInfo(req.guild, id)),
+    });
+  });
+  api.put('/guilds/:gid/access', async (req, res) => {
+    if (req.guild.ownerId !== req.userId) throw new UserError('Pristup dashboardu može mijenjati samo vlasnik servera.');
+    const ids = Array.isArray(req.body?.userIds) ? [...new Set(req.body.userIds.map(String))] : [];
+    if (ids.length > 50) throw new UserError('Najviše 50 članova može imati pristup dashboardu.');
+    const clean = [];
+    for (const id of ids) {
+      if (id === req.guild.ownerId) continue;
+      const member = req.guild.members.cache.get(id) ?? (await req.guild.members.fetch(id).catch(() => null));
+      if (!member) throw new UserError('Jedan od odabranih članova više nije na serveru.');
+      if (member.user.bot) throw new UserError('Bot ne može imati pristup dashboardu.');
+      clean.push(id);
+    }
+    req.g.config.dashboardUsers = clean;
+    db.save();
+    ok(res, { users: clean.map((id) => userInfo(req.guild, id)) });
   });
 
   // ---------- welcome / boost / autoroles ----------
@@ -511,6 +545,27 @@ export function startDashboard(client, port) {
       throw new UserError('Bot treba permisiju View Audit Log (najbolje Administrator).');
     }
     ok(res, { config: antinuke.saveConfig(req.guild.id, body) });
+  });
+
+  // ---------- anti-link ----------
+  api.get('/guilds/:gid/antilink', (req, res) => {
+    res.json({
+      config: antilink.getConfig(req.guild.id),
+      modLogChannelId: req.g.config.modLogChannelId ?? null,
+      canDelete: req.guild.members.me.permissions.has(PermissionFlagsBits.ManageMessages),
+    });
+  });
+  api.put('/guilds/:gid/antilink', (req, res) => {
+    const body = req.body ?? {};
+    const roles = Array.isArray(body.whitelistRoles) ? body.whitelistRoles : [];
+    const channels = Array.isArray(body.whitelistChannels) ? body.whitelistChannels : [];
+    for (const id of roles) {
+      if (!req.guild.roles.cache.has(String(id))) throw new UserError('Jedna od odabranih rola više ne postoji.');
+    }
+    for (const id of channels) {
+      if (!req.guild.channels.cache.has(String(id))) throw new UserError('Jedan od odabranih kanala više ne postoji.');
+    }
+    ok(res, { config: antilink.saveConfig(req.guild.id, { ...body, whitelistRoles: roles, whitelistChannels: channels }) });
   });
 
   // ---------- moderation ----------

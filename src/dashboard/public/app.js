@@ -898,12 +898,14 @@
   const NAV = [
     { group: 'Server', items: [
       { key: 'overview', label: 'Pregled', icon: 'ti-layout-dashboard' },
+      { key: 'access', label: 'Pristup dashboardu', icon: 'ti-lock' },
       { key: 'welcome', label: 'Dobrodošlica i role', icon: 'ti-user-plus' },
       { key: 'invites', label: 'Invite-ovi', icon: 'ti-user-share' },
       { key: 'stats', label: 'Statistika', icon: 'ti-chart-bar' },
     ] },
     { group: 'Sigurnost', items: [
       { key: 'antinuke', label: 'Anti-nuke', icon: 'ti-shield' },
+      { key: 'antilink', label: 'Zaštita od linkova', icon: 'ti-link-off' },
       { key: 'moderation', label: 'Moderacija', icon: 'ti-gavel' },
     ] },
     { group: 'Alati', items: [
@@ -1222,6 +1224,140 @@
       </div>`);
   }
 
+  // ---------- Dashboard access ----------
+  async function pageAccess(ctx) {
+    ctx.head = pageHead('Pristup dashboardu', 'Osim vlasnika servera, dashboard mogu otvoriti samo članovi koje ovdje dodaš.');
+    mount(ctx.el, html`${ctx.head}<div class="cols cols-form-right"><div class="stack">${skelCard(420)}</div><div class="stack">${skelCard(220)}</div></div>`);
+    const res = await ctx.load(() => Promise.all([guildData(ctx.gid), api('GET', g$(ctx.gid, '/access'))]));
+    if (!res) return;
+    const [g, access] = res;
+    const users = (access.users || []).map((u) => u.id);
+    const names = new Map((access.users || []).map((u) => [u.id, u]));
+    if (access.owner) names.set(access.owner.id, access.owner);
+    Object.assign(state.page, { g, ctx, access, users, names, snap: [...users].sort().join(',') });
+    memberPickers.access = {
+      taken(id) {
+        const { access: a, users: list } = state.page;
+        if (a.owner && a.owner.id === id) return 'vlasnik, uvijek ima pristup';
+        return list.includes(id) ? 'već ima pristup' : null;
+      },
+      pick(user) {
+        const { users: list, names: map } = state.page;
+        if (list.includes(user.id)) return;
+        list.push(user.id);
+        map.set(user.id, { name: user.name, avatarUrl: user.avatarUrl });
+        redrawAccess();
+      },
+    };
+    drawAccess();
+    state.leaveGuard = accessDirty;
+  }
+  function accessRow(user, isOwner) {
+    const { access } = state.page;
+    const canEdit = access.canEdit && !isOwner;
+    return html`<li>${avatar(user && user.avatarUrl, user ? user.name : '?', 'avatar-sm')}
+      <span class="row-main">
+        <span class="row-title truncate" style="display:block">${user ? user.name : 'Nepoznat član'}${isOwner ? html` <span class="badge badge-success">Vlasnik</span>` : ''}</span>
+        <span class="row-meta" style="display:block">${isOwner ? 'Uvijek ima pristup' : 'Dodan/a na dashboard'}</span>
+      </span>
+      ${canEdit ? html`<button type="button" class="btn-icon" data-action="access-remove" data-id="${user.id}" aria-label="Ukloni ${user.name} s dashboarda" data-tip="Ukloni pristup">${icon('ti-x')}</button>` : ''}
+    </li>`;
+  }
+  function accessList() {
+    const { access, users, names } = state.page;
+    return html`<ul class="plain-list">${accessRow(access.owner, true)}${users.map((id) => accessRow(names.get(id) || { id, name: `Korisnik ${id.slice(-4)}`, avatarUrl: null }, false))}</ul>`;
+  }
+  function drawAccess() {
+    const { g, ctx, access, users } = state.page;
+    const canEdit = access.canEdit;
+    const roNote = canEdit ? '' : html`<p class="ro-note">${icon('ti-lock', 'ti-sm')}<span>Pristup može mijenjati samo vlasnik servera, <span class="strong">${access.owner ? access.owner.name : 'vlasnik'}</span>. Ti ga možeš samo pregledati.</span></p>`;
+    mount(ctx.el, html`${ctx.head}${roNote}
+      <form class="access-form" data-form="access" novalidate>
+        <div class="cols cols-form-right">
+          <div class="stack">
+            <section class="card" aria-labelledby="ac-h">
+              <div class="card-head"><div><h2 class="card-title" id="ac-h">Članovi s pristupom <span class="count num">${fmtNum(users.length + 1)}</span></h2>
+                <p class="card-desc">Vlasnik servera uvijek ima pristup. Dodaj članove kojima vjeruješ; oni ne trebaju imati moderatorske dozvole u Discordu.</p></div>
+                <span id="ac-badge">${statusBadge(users.length > 0, count(users.length, 'dodan član', 'dodana člana', 'dodanih članova'), 'Samo vlasnik')}</span></div>
+              <div class="fields">
+                ${canEdit ? html`<div class="field"><span class="label" id="ac-search-l">Dodaj člana</span>${memberSearch('access', 'Pronađi člana za pristup dashboardu', 'is-full')}</div>` : ''}
+                <div id="ac-list" aria-live="polite">${accessList()}</div>
+              </div>
+            </section>
+            ${canEdit ? html`<div class="savebar">
+              <div class="btn-group"><button type="submit" class="btn btn-primary" disabled>Spremi promjene</button><button type="button" class="btn" data-action="access-discard" disabled>Odbaci promjene</button></div>
+              <p class="savebar-status" aria-live="polite">Nema nespremljenih promjena.</p>
+            </div>` : ''}
+          </div>
+          <div class="stack">
+            <section class="card" aria-labelledby="ac-i-h">
+              <div class="card-head"><div><h2 class="card-title" id="ac-i-h">Kako radi pristup</h2></div></div>
+              <ul class="plain-list">
+                <li>${icon('ti-crown')}<span class="row-main">Vlasnik servera ima pristup uvijek i ne može se ukloniti.</span></li>
+                <li>${icon('ti-user-check')}<span class="row-main">Dodani članovi vide samo ovaj server i mogu mijenjati njegove postavke na dashboardu.</span></li>
+                <li>${icon('ti-shield-lock')}<span class="row-main">Svi ostali, uključujući admine koji nisu dodani, dobivaju poruku da nemaju pristup.</span></li>
+                <li>${icon('ti-user-minus')}<span class="row-main">Kad nekoga ukloniš, pristup mu prestaje odmah, bez čekanja da istekne prijava.</span></li>
+              </ul>
+            </section>
+          </div>
+        </div>
+      </form>`);
+    accessSyncBar();
+  }
+  function redrawAccess() {
+    const box = $('#ac-list');
+    if (box) mount(box, accessList());
+    const badge = $('#ac-badge');
+    if (badge) {
+      const n = state.page.users.length;
+      mount(badge, statusBadge(n > 0, count(n, 'dodan član', 'dodana člana', 'dodanih članova'), 'Samo vlasnik'));
+    }
+    accessSyncBar();
+  }
+  function accessDirty() {
+    const { access, users, snap } = state.page;
+    if (!access || !access.canEdit) return false;
+    return [...users].sort().join(',') !== snap;
+  }
+  function accessSyncBar() {
+    const bar = $('form[data-form="access"] .savebar');
+    if (!bar) return;
+    const dirty = accessDirty();
+    bar.classList.toggle('is-dirty', dirty);
+    $$('.btn', bar).forEach((b) => { if (!b.classList.contains('is-loading')) b.disabled = !dirty; });
+    const st = $('.savebar-status', bar);
+    const text = dirty ? 'Imaš nespremljene promjene.' : 'Nema nespremljenih promjena.';
+    if (st.textContent !== text) st.textContent = text;
+  }
+  actions['access-remove'] = (btn) => {
+    const { users } = state.page;
+    const i = users.indexOf(btn.dataset.id);
+    if (i < 0) return;
+    users.splice(i, 1);
+    redrawAccess();
+    const next = $('#ac-list [data-action="access-remove"]') || $('[data-member-search="access"]');
+    if (next) next.focus();
+  };
+  actions['access-discard'] = () => {
+    const { access } = state.page;
+    state.page.users = (access.users || []).map((u) => u.id);
+    redrawAccess();
+    toast('info', 'Promjene su odbačene', 'Vraćen je spremljeni popis članova.');
+  };
+  forms.access = async (f, btn) => {
+    const { g, access, users, names } = state.page;
+    if (!access.canEdit || !accessDirty()) return;
+    let res;
+    const done = await run(btn, async () => { res = await api('PUT', g$(g.id, '/access'), { userIds: users }); }, 'Spremanje nije uspjelo');
+    if (!done) return;
+    access.users = (res && res.users) || [];
+    state.page.users = access.users.map((u) => u.id);
+    for (const u of access.users) names.set(u.id, u);
+    state.page.snap = [...state.page.users].sort().join(',');
+    drawAccess();
+    toast('success', 'Pristup je spremljen', state.page.users.length ? 'Dodani članovi mogu otvoriti dashboard.' : 'Dashboard može otvoriti samo vlasnik servera.');
+  };
+
   // ---------- Overview ----------
   const ACTIVITY_ICONS = {
     join: 'ti-user-plus', leave: 'ti-user-minus', boost: 'ti-rocket',
@@ -1252,6 +1388,7 @@
       { page: 'stats', name: 'Kanali statistike', on: c.stats.enabled, meta: c.stats.enabled ? 'Članovi, botovi i boostovi' : 'Nisu postavljeni' },
       { page: 'tickets', name: 'Tiketi', on: c.tickets.enabled, meta: c.tickets.enabled ? count(c.tickets.openCount || 0, 'otvoren tiket', 'otvorena tiketa', 'otvorenih tiketa') : 'Članovi ne mogu otvoriti tiket' },
       { page: 'antinuke', name: 'Anti-nuke', on: !!(c.antinuke && c.antinuke.enabled), meta: c.antinuke && c.antinuke.enabled ? 'Masovne štetne radnje se kažnjavaju' : 'Server nije zaštićen od nukea' },
+      { page: 'antilink', name: 'Zaštita od linkova', on: !!(c.antilink && c.antilink.enabled), meta: c.antilink && c.antilink.enabled ? 'Linkovi i pozivnice se brišu članovima' : 'Članovi mogu slati linkove' },
       { page: 'moderation', name: 'Zapisnik moderacije', on: !!c.modLogChannelId, meta: c.modLogChannelId ? chan(c.modLogChannelId) : 'Moderatorske radnje se ne bilježe' },
       { page: 'games', name: 'Kaladont', on: (c.kaladontCount || 0) > 0, meta: c.kaladontCount ? `Igra se u ${count(c.kaladontCount, 'kanalu', 'kanala', 'kanala')}` : 'Ne igra se ni u jednom kanalu' },
     ];
@@ -2785,6 +2922,91 @@
     if (state.leaveGuard && state.leaveGuard()) { e.preventDefault(); e.returnValue = ''; }
   });
 
+  // ---------- Anti-link ----------
+  async function pageAntiLink(ctx) {
+    ctx.head = pageHead('Zaštita od linkova', 'Briše poruke s linkovima i Discord pozivnicama članovima koji nisu moderatori.');
+    mount(ctx.el, html`${ctx.head}<div class="cols cols-form-right"><div class="stack">${skelCard(360)}${skelCard(320)}</div><div class="stack">${skelCard(280)}</div></div>`);
+    const res = await ctx.load(() => Promise.all([guildData(ctx.gid), api('GET', g$(ctx.gid, '/antilink'))]));
+    if (!res) return;
+    const [g, al] = res;
+    Object.assign(state.page, { g, ctx, al: al.config, modLogChannelId: al.modLogChannelId || null, canDelete: al.canDelete !== false });
+    drawAntiLink();
+  }
+  function drawAntiLink() {
+    const { g, ctx, al, modLogChannelId, canDelete } = state.page;
+    const id = { roles: uid('f'), chans: uid('f') };
+    const warn = canDelete ? '' : html`<div class="callout callout-warning page-callout">${icon('ti-alert-triangle')}<div>
+      <p class="callout-title">Bot ne može brisati poruke</p>
+      <p class="callout-body">U Discordu daj botu dozvolu <span class="strong">Manage Messages</span> u kanalima u kojima želiš zaštitu. Bez nje poruke ostaju vidljive.</p>
+    </div></div>`;
+    const toggle = (name, label, desc, checked) => html`<label class="toggle toggle-top"><input type="checkbox" role="switch" name="${name}" ${checked ? raw('checked') : ''}><span class="track" aria-hidden="true"></span>
+      <span>${label}${desc ? html`<span class="toggle-desc">${desc}</span>` : ''}</span></label>`;
+    mount(ctx.el, html`${ctx.head}${warn}
+      <form class="form" data-form="antilink" novalidate>
+        <div class="cols cols-form-right">
+          <div class="stack">
+            <section class="card" aria-labelledby="al-g-h">
+              <div class="card-head"><div><h2 class="card-title" id="al-g-h">Pravila brisanja</h2>
+                <p class="card-desc">Poruka se briše čim sadrži zabranjeni sadržaj. Vlasnik, bot i članovi s moderatorskim dozvolama su izuzeti.</p></div>
+                <span id="al-badge">${statusBadge(al.enabled)}</span></div>
+              <div class="fields">
+                ${toggle('enabled', 'Uključi zaštitu od linkova', 'Kad je isključeno, članovi mogu slati linkove bez ograničenja.', al.enabled)}
+                <div class="field-row">
+                  ${toggle('blockInvites', 'Briši Discord pozivnice', 'npr. discord.gg/..., discord.com/invite/...', al.blockInvites)}
+                  ${toggle('blockLinks', 'Briši obične linkove', 'http(s)://, www. i domene poput example.com', al.blockLinks)}
+                </div>
+                ${toggle('notify', 'Pošalji kratku poruku članu', 'Bot u kanalu napiše zašto je poruka obrisana; poruka se sama obriše nakon nekoliko sekundi.', al.notify)}
+              </div>
+            </section>
+            <section class="card" aria-labelledby="al-w-h">
+              <div class="card-head"><div><h2 class="card-title" id="al-w-h">Iznimke</h2>
+                <p class="card-desc">Ovi kanali i role smiju slati linkove. Moderatori su izuzeti automatski.</p></div></div>
+              <div class="fields">
+                ${field({ name: 'whitelistRoles', label: 'Role koje smiju slati linkove', id: id.roles, help: 'Svi članovi s nekom od ovih rola neće imati obrisane poruke.',
+                  control: selectField({ id: id.roles, name: 'whitelistRoles', multiple: true, options: roleOptions(g), value: al.whitelistRoles || [], placeholder: 'Bez izuzetih rola', emptyText: 'Server nema rola.', describedBy: `${id.roles}-help` }) })}
+                ${field({ name: 'whitelistChannels', label: 'Kanali u kojima su linkovi dopušteni', id: id.chans, help: 'Korisno za kanale s najavama ili vanjskim sadržajem.',
+                  control: selectField({ id: id.chans, name: 'whitelistChannels', multiple: true, options: textChannelOptions(g), value: al.whitelistChannels || [], placeholder: 'Bez izuzetih kanala', emptyText: 'Server nema tekstualnih kanala.', describedBy: `${id.chans}-help` }) })}
+              </div>
+            </section>
+            <div class="form-actions"><button type="submit" class="btn btn-primary">Spremi promjene</button></div>
+          </div>
+          <div class="stack">
+            <section class="card" aria-labelledby="al-i-h">
+              <div class="card-head"><div><h2 class="card-title" id="al-i-h">Kako radi</h2></div></div>
+              <ul class="plain-list">
+                <li>${icon('ti-trash')}<span class="row-main">Poruka s linkom ili pozivnicom se odmah briše.</span></li>
+                <li>${icon('ti-shield-check')}<span class="row-main">Izuzeti su vlasnik, bot, moderatori te role i kanali koje odabereš.</span></li>
+                <li>${icon('ti-file-text')}<span class="row-main">Svako brisanje se bilježi u kanal zapisnika moderacije${modLogChannelId ? ` (#${channelName(g, modLogChannelId) || 'kanal'})` : ''}.</span></li>
+              </ul>
+              <p class="section-gap"><a class="link-btn" href="${guildHref(g.id, 'moderation')}">${icon('ti-gavel')}Postavi zapisnik moderacije</a></p>
+            </section>
+          </div>
+        </div>
+      </form>`);
+  }
+  forms.antilink = async (f, btn) => {
+    const { g } = state.page;
+    const body = {
+      enabled: f.elements.enabled.checked,
+      blockInvites: f.elements.blockInvites.checked,
+      blockLinks: f.elements.blockLinks.checked,
+      notify: f.elements.notify.checked,
+      whitelistRoles: multiValue(f, 'whitelistRoles'),
+      whitelistChannels: multiValue(f, 'whitelistChannels'),
+    };
+    if (body.enabled && !body.blockInvites && !body.blockLinks) {
+      toast('error', 'Odaberi barem jedno pravilo', 'Uključi brisanje pozivnica, običnih linkova ili oboje.');
+      return;
+    }
+    let res;
+    const done = await run(btn, async () => { res = await api('PUT', g$(g.id, '/antilink'), body); }, 'Spremanje nije uspjelo');
+    if (!done) return;
+    state.page.al = (res && res.config) || { ...state.page.al, ...body };
+    invalidateGuild(g.id);
+    drawAntiLink();
+    toast('success', 'Promjene su spremljene', state.page.al.enabled ? 'Zaštita od linkova je uključena.' : 'Zaštita od linkova je isključena.');
+  };
+
   // ---------- Moderation ----------
   const MOD_COMMANDS = [
     ['/purge', 'broj [korisnik] [botovi] [sadrzi]', 'Briše do 100 poruka odjednom, po želji samo od jednog člana, od botova ili s određenim tekstom.'],
@@ -3103,6 +3325,7 @@
 
   const PAGES = {
     overview: pageOverview,
+    access: pageAccess,
     welcome: pageWelcome,
     stats: pageStats,
     tickets: pageTickets,
@@ -3111,6 +3334,7 @@
     giveaways: pageGiveaways,
     music: pageMusic,
     antinuke: pageAntinuke,
+    antilink: pageAntiLink,
     moderation: pageModeration,
     games: pageGames,
   };
