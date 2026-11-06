@@ -185,6 +185,18 @@ export function startDashboard(client, port) {
     if (!ch || ![ChannelType.GuildText, ChannelType.GuildAnnouncement].includes(ch.type)) throw new UserError('Odaberi tekstualni kanal.');
     return ch;
   };
+  const imageUrlOf = (value) => {
+    const raw = String(value ?? '').trim();
+    if (!raw) return null;
+    if (raw.length > 2048) throw new UserError('URL slike je predugačak.');
+    try {
+      const url = new URL(raw);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('protocol');
+      return url.href;
+    } catch {
+      throw new UserError('Upiši ispravan URL slike (http ili https).');
+    }
+  };
   const optionalText = (guild, id) => (id ? textChannel(guild, id) : null);
   const ok = (res, extra = {}) => res.json({ ok: true, ...extra });
 
@@ -218,12 +230,14 @@ export function startDashboard(client, port) {
           enabled: Boolean(g.config.welcome),
           channelId: g.config.welcome?.channelId ?? null,
           message: g.config.welcome?.message ?? '',
+          imageUrl: g.config.welcome?.imageUrl ?? null,
           defaultMessage: DEFAULT_WELCOME,
         },
         boost: {
           enabled: Boolean(g.config.boost),
           channelId: g.config.boost?.channelId ?? null,
           message: g.config.boost?.message ?? '',
+          imageUrl: g.config.boost?.imageUrl ?? null,
           defaultMessage: DEFAULT_BOOST,
         },
         autoroles: g.config.autoroles ?? [],
@@ -281,13 +295,13 @@ export function startDashboard(client, port) {
   // ---------- welcome / boost / autoroles ----------
   for (const kind of ['welcome', 'boost']) {
     api.put(`/guilds/:gid/${kind}`, (req, res) => {
-      const { enabled, channelId, message } = req.body ?? {};
+      const { enabled, channelId, message, imageUrl } = req.body ?? {};
       if (!enabled) delete req.g.config[kind];
       else {
         const channel = textChannel(req.guild, channelId);
         const text = String(message ?? '').trim();
         if (text.length > 2000) throw new UserError('Poruka može imati najviše 2000 znakova.');
-        req.g.config[kind] = { channelId: channel.id, message: text || null };
+        req.g.config[kind] = { channelId: channel.id, message: text || null, imageUrl: imageUrlOf(imageUrl) };
       }
       db.save();
       ok(res);

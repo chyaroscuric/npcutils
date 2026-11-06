@@ -860,6 +860,9 @@ a.np-title:hover { color: var(--accent-glow); }
 }
 .preview strong { color: var(--text); font-weight: 600; }
 .preview .mention { color: var(--accent-text); background: var(--accent-tint); border-radius: var(--radius-2xs); padding: 0 4px; }
+.preview-image { margin-top: 12px; }
+.preview-image:empty { display: none; }
+.preview-image img { display: block; width: 100%; max-height: 280px; object-fit: cover; border-radius: var(--radius-md); }
 .var-list { display: grid; gap: 8px; margin: 0; }
 .var-list div { display: flex; gap: 12px; align-items: baseline; }
 .var-list dt { font-family: var(--font-mono); font-size: 13px; color: var(--text); min-width: 112px; }

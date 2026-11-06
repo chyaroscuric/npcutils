@@ -13,7 +13,7 @@ export async function giveAutoroles(member) {
   const roles = (g.config.autoroles ?? [])
     .map((id) => member.guild.roles.cache.get(id))
     .filter((role) => role && !roleProblem(member.guild, role));
-  if (roles.length) await member.roles.add(roles, 'Jaankeza Utils autorole');
+  if (roles.length) await member.roles.add(roles, `${member.guild.client.user.username}: autorole`);
 }
 
 export function welcomePayload(member, inviterId) {
@@ -35,6 +35,7 @@ export function welcomePayload(member, inviterId) {
     .setDescription(text)
     .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
     .setTimestamp();
+  if (cfg?.imageUrl) embed.setImage(cfg.imageUrl);
   return { content: `${member}`, embeds: [embed], allowedMentions: { users: [member.id] } };
 }
 
@@ -61,6 +62,7 @@ export function boostPayload(member) {
     .setDescription(text)
     .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
     .setTimestamp();
+  if (cfg?.imageUrl) embed.setImage(cfg.imageUrl);
   return { content: `${member}`, embeds: [embed], allowedMentions: { users: [member.id] } };
 }
 

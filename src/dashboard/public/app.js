@@ -1513,7 +1513,7 @@
     const c = g.config[kind];
     const isW = kind === 'welcome';
     const vars = isW ? WELCOME_VARS : BOOST_VARS;
-    const id = { ch: uid('f'), msg: uid('f') };
+    const id = { ch: uid('f'), msg: uid('f'), img: uid('f') };
     return html`<div class="cols cols-form-right">
       <section class="card" aria-labelledby="msg-h">
         <div class="card-head"><div><h2 class="card-title" id="msg-h">${isW ? 'Poruka dobrodošlice' : 'Poruka za boost'}</h2>
@@ -1529,6 +1529,8 @@
               <textarea class="input" id="${id.msg}" name="message" rows="6" maxlength="2000" placeholder="${c.defaultMessage}" aria-describedby="${id.msg}-help">${c.message}</textarea>
               <p class="help help-row" id="${id.msg}-help"><span>Ostavi prazno za zadanu poruku. Radi Discord markdown, npr. **podebljano**.</span><span class="num" data-counter>0 / 2000</span></p>
             </div>
+            ${field({ name: 'imageUrl', label: 'Slika (URL)', id: id.img, help: 'Zalijepi link na sliku (PNG, JPG, GIF ili WebP). Ostavi prazno ako ne želiš sliku.',
+              control: html`<input class="input" id="${id.img}" name="imageUrl" type="url" maxlength="2048" value="${c.imageUrl || ''}" placeholder="https://example.com/slika.png" aria-describedby="${id.img}-help">` })}
             <div class="field">
               <span class="label" id="${id.msg}-vars">Varijable</span>
               <div class="chips" role="group" aria-labelledby="${id.msg}-vars">${vars.map(([v, d]) => html`<button type="button" class="chip mono" data-action="insert-var" data-var="${v}" data-tip="${d}" aria-label="Umetni ${v}: ${d}">${v}</button>`)}</div>
@@ -1545,6 +1547,7 @@
       <aside class="card" aria-labelledby="prev-h">
         <div class="card-head"><div><h2 class="card-title" id="prev-h">Pregled</h2><p class="card-desc">S primjerima umjesto varijabli.</p></div></div>
         <div class="preview" data-preview aria-live="off"></div>
+        <div class="preview-image" data-preview-img aria-live="off"></div>
         <dl class="var-list section-gap">${vars.map(([v, d]) => html`<div><dt>${v}</dt><dd>${d}</dd></div>`)}</dl>
         <p class="section-gap"><button type="button" class="link-btn" data-action="use-default" data-kind="${kind}">Uredi zadanu poruku</button></p>
       </aside>
@@ -1574,10 +1577,16 @@
     const text = ta.value.trim() ? ta.value : state.page.g.config[kind].defaultMessage;
     const prev = $('[data-preview]', $('#content'));
     if (prev) mount(prev, renderPreview(text, kind));
+    const imgBox = $('[data-preview-img]', $('#content'));
+    if (imgBox) {
+      const url = safeUrl(f.elements.imageUrl?.value.trim());
+      if (url) mount(imgBox, html`<img src="${url}" alt="" loading="lazy" referrerpolicy="no-referrer">`);
+      else imgBox.replaceChildren();
+    }
     const counter = $('[data-counter]', f);
     if (counter) counter.textContent = `${fmtNum(ta.value.length)} / 2000`;
   }
-  const msgSnapshot = (f) => JSON.stringify([formValue(f, 'enabled'), formValue(f, 'channelId'), formValue(f, 'message')]);
+  const msgSnapshot = (f) => JSON.stringify([formValue(f, 'enabled'), formValue(f, 'channelId'), formValue(f, 'message'), formValue(f, 'imageUrl')]);
   inputs.msg = (f) => updateMsgPreview(f);
   actions['insert-var'] = (btn) => {
     const ta = btn.closest('form').elements.message;
@@ -1598,7 +1607,9 @@
   forms.msg = async (f, btn) => {
     clearErrors(f);
     const kind = f.dataset.kind;
-    const body = { enabled: formValue(f, 'enabled'), channelId: formValue(f, 'channelId') || null, message: formValue(f, 'message').trim() };
+    const imageUrl = formValue(f, 'imageUrl').trim();
+    if (imageUrl && !safeUrl(imageUrl)) return fieldError(f, 'imageUrl', 'Upiši ispravan URL slike (http ili https).');
+    const body = { enabled: formValue(f, 'enabled'), channelId: formValue(f, 'channelId') || null, message: formValue(f, 'message').trim(), imageUrl: imageUrl || null };
     if (body.enabled && !body.channelId) return fieldError(f, 'channelId', 'Odaberi kanal u koji bot šalje poruku.');
     const { g } = state.page;
     const ok = await run(btn, () => api('PUT', g$(g.id, `/${kind}`), body), 'Spremanje nije uspjelo');
