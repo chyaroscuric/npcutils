@@ -11,6 +11,7 @@ import { DEFAULT_BOOST, DEFAULT_WELCOME, boostPayload, welcomePayload } from '..
 import * as music from '../features/music.js';
 import * as antinuke from '../features/antinuke.js';
 import * as antilink from '../features/antilink.js';
+import * as botSettings from '../features/botSettings.js';
 import * as kaladont from '../features/games/kaladont.js';
 import { clearWarns } from '../features/moderation.js';
 import * as reactionRoles from '../features/reactionRoles.js';
@@ -158,12 +159,38 @@ export function startDashboard(client, port) {
       bot: {
         id: client.user.id,
         name: client.user.username,
+        displayName: client.user.globalName ?? client.user.username,
         avatarUrl: avatarOf(client.user),
         inviteUrl: `https://discord.com/oauth2/authorize?client_id=${client.user.id}&permissions=8&scope=bot%20applications.commands`,
         ping: client.ws.ping,
         uptimeMs: client.uptime,
+        status: botSettings.getSettings().status,
+        canEditStatus: botSettings.canEdit(client, req.userId),
+        statusTypes: Object.entries(botSettings.STATUS_TYPES).map(([key, label]) => ({ key, label })),
+        presenceStates: Object.entries(botSettings.PRESENCE_STATES).map(([key, label]) => ({ key, label })),
       },
     });
+  });
+
+  // ---------- global bot settings ----------
+  api.get('/bot', (req, res) => {
+    res.json({
+      id: client.user.id,
+      name: client.user.username,
+      displayName: client.user.globalName ?? client.user.username,
+      avatarUrl: avatarOf(client.user),
+      status: botSettings.getSettings().status,
+      canEditStatus: botSettings.canEdit(client, req.userId),
+      statusTypes: Object.entries(botSettings.STATUS_TYPES).map(([key, label]) => ({ key, label })),
+      presenceStates: Object.entries(botSettings.PRESENCE_STATES).map(([key, label]) => ({ key, label })),
+    });
+  });
+  api.put('/bot/status', async (req, res) => {
+    if (!botSettings.canEdit(client, req.userId)) throw new UserError('Status bota može mijenjati samo vlasnik bota.');
+    const input = req.body?.status ?? req.body ?? {};
+    const settings = botSettings.saveSettings({ status: input });
+    await botSettings.applyStatus(client);
+    ok(res, { status: settings.status });
   });
 
   // every /guilds/:gid route: owner, or a member the owner explicitly added to the dashboard

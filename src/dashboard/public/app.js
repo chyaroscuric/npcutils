@@ -1,4 +1,4 @@
-/* Jaankeza Utils dashboard - vanilla JS, no build step.
+/* Dashboard - vanilla JS, no build step.
  * Loaded as a classic blocking script in <head> so the saved accent colour is applied
  * before first paint; the app itself boots on DOMContentLoaded. */
 (() => {
@@ -28,7 +28,7 @@
     sky:     { name: 'Nebeskoplava', 400: '#38bdf8', 500: '#0ea5e9', 700: '#0369a1', 800: '#075985' },
   };
   const DEEP_PRESETS = new Set(['indigo', 'violet', 'purple']);
-  const ACCENT_KEY = 'jaankeza-dashboard.accent';
+  const ACCENT_KEY = 'dashboard.accent';
   const SIDEBAR_BG = '#1c1e23';
 
   function presetTokens(key) {
@@ -945,7 +945,7 @@
     $$('.modal-backdrop').forEach((m) => m.remove());
     document.body.style.overflow = '';
     const bot = (data && data.bot) || {};
-    const name = bot.name || 'Jaankeza Utils';
+    const name = bot.name || 'Bot';
     document.title = `Prijava · ${name}`;
     const app = $('#app');
     app.removeAttribute('aria-busy');
@@ -1021,7 +1021,7 @@
       </div>`);
     mount($('#topbar-title'), guild
       ? html`${avatar(guild.iconUrl, guild.name, 'avatar-sm avatar-guild')}<span class="truncate">${guild.name}</span>`
-      : html`${avatar(me.bot && me.bot.avatarUrl, (me.bot && me.bot.name) || 'Jaankeza Utils', 'avatar-sm')}<span class="truncate">${(me.bot && me.bot.name) || 'Jaankeza Utils'}</span>`);
+      : html`${avatar(me.bot && me.bot.avatarUrl, (me.bot && me.bot.name) || 'Bot', 'avatar-sm')}<span class="truncate">${(me.bot && me.bot.name) || 'Bot'}</span>`);
   }
 
   function openDrawer() {
@@ -1125,7 +1125,7 @@
     }
     renderSidebar(route);
     const ctx = makeCtx(route, token);
-    const botName = (state.me.bot && state.me.bot.name) || 'Jaankeza Utils';
+    const botName = (state.me.bot && state.me.bot.name) || 'Bot';
     if (route.name === 'home') {
       document.title = `Serveri · ${botName}`;
       pageHome(ctx);
@@ -1187,12 +1187,45 @@
    * ===================================================================== */
 
   // ---------- Server picker ----------
+  function botStatusCard(bot) {
+    if (!bot) return '';
+    const st = bot.status || { text: '', type: 'custom', state: 'online' };
+    const can = Boolean(bot.canEditStatus);
+    const id = { text: uid('f'), type: uid('f'), state: uid('f') };
+    const typeOpts = (bot.statusTypes?.length ? bot.statusTypes : [
+      { key: 'custom', label: 'Custom' }, { key: 'playing', label: 'Playing' }, { key: 'watching', label: 'Watching' },
+      { key: 'listening', label: 'Listening' }, { key: 'competing', label: 'Competing' },
+    ]).map((t) => ({ value: t.key, label: t.label }));
+    const stateOpts = (bot.presenceStates?.length ? bot.presenceStates : [
+      { key: 'online', label: 'Online' }, { key: 'idle', label: 'Idle' }, { key: 'dnd', label: 'Do Not Disturb' }, { key: 'invisible', label: 'Invisible' },
+    ]).map((s) => ({ value: s.key, label: s.label }));
+    return html`<section class="card" aria-labelledby="bs-h">
+      <div class="card-head"><div><h2 class="card-title" id="bs-h">Status bota</h2>
+        <p class="card-desc">Prikazuje se svim članovima na svim serverima. Ime i slika dolaze s Discord računa bota.</p></div>
+        ${statusBadge(Boolean(st.text), 'Postavljen', 'Bez statusa')}</div>
+      <form class="form" data-form="botstatus" novalidate>
+        <div class="fields">
+          ${field({ name: 'text', label: 'Tekst statusa', id: id.text, help: 'Do 128 znakova. Ostavi prazno za status bez aktivnosti.',
+            control: html`<input class="input" id="${id.text}" name="text" maxlength="128" value="${st.text || ''}" placeholder="npr. Slušam vaše prijedloge" ${can ? '' : raw('disabled')}>` })}
+          <div class="field-row">
+            ${field({ name: 'type', label: 'Vrsta', id: id.type,
+              control: selectField({ id: id.type, name: 'type', options: typeOpts, value: st.type, searchable: false, disabled: !can, placeholder: 'Vrsta' }) })}
+            ${field({ name: 'state', label: 'Stanje', id: id.state,
+              control: selectField({ id: id.state, name: 'state', options: stateOpts, value: st.state, searchable: false, disabled: !can, placeholder: 'Stanje' }) })}
+          </div>
+        </div>
+        ${can
+          ? html`<div class="form-actions"><button type="submit" class="btn btn-primary">Spremi status</button></div>`
+          : html`<p class="ro-note">${icon('ti-lock', 'ti-sm')}<span>Status može mijenjati samo vlasnik bota.</span></p>`}
+      </form>
+    </section>`;
+  }
   function pageHome(ctx) {
     const { guilds, bot } = state.me;
     const invite = safeUrl(bot && bot.inviteUrl);
     const botCard = html`<aside class="card">
-      <div class="card-head"><div class="who">${avatar(bot && bot.avatarUrl, (bot && bot.name) || 'Jaankeza Utils', 'avatar-lg')}
-        <div style="min-width:0"><h2 class="card-title">${(bot && bot.name) || 'Jaankeza Utils'}</h2><p class="card-desc">Bot za upravljanje serverom</p></div></div>
+      <div class="card-head"><div class="who">${avatar(bot && bot.avatarUrl, (bot && bot.name) || 'Bot', 'avatar-lg')}
+        <div style="min-width:0"><h2 class="card-title">${(bot && bot.name) || 'Bot'}</h2><p class="card-desc">Bot za upravljanje serverom</p></div></div>
         <span class="badge badge-success">${icon('ti-circle-check')}Na mreži</span>
       </div>
       <dl class="kv-grid">
@@ -1202,12 +1235,13 @@
       </dl>
       ${invite && guilds.length ? html`<div class="form-actions"><a class="btn" href="${invite}" target="_blank" rel="noopener noreferrer">${icon('ti-plus')}Dodaj bota na server ${extArrow}</a></div>` : ''}
     </aside>`;
+    const statusCard = botStatusCard(bot);
     if (!guilds.length) {
       mount(ctx.el, html`${pageHead('Serveri', 'Ovdje se pojavljuju serveri na kojima je bot i kojima možeš upravljati.')}
         <div class="cols cols-wide-left">
           <section class="card">${emptyState('ti-server-off', 'Bot još nije ni na jednom serveru kojim upravljaš. Dodaj ga na server, a zatim osvježi ovu stranicu.',
             html`<div class="btn-group">${invite ? html`<a class="btn btn-primary" href="${invite}" target="_blank" rel="noopener noreferrer">${icon('ti-plus')}Dodaj bota na server ${extArrow}</a>` : ''}<button type="button" class="btn" data-action="reload">Osvježi</button></div>`)}</section>
-          ${botCard}
+          <div class="stack">${botCard}${statusCard}</div>
         </div>`);
       return;
     }
@@ -1220,9 +1254,25 @@
             ${icon('ti-chevron-right', 'chev')}
           </a></li>`)}
         </ul>
-        ${botCard}
+        <div class="stack">${botCard}${statusCard}</div>
       </div>`);
   }
+
+  forms.botstatus = async (f, btn) => {
+    const { bot } = state.me;
+    if (!bot || !bot.canEditStatus) return;
+    const status = {
+      text: formValue(f, 'text').trim(),
+      type: formValue(f, 'type') || 'custom',
+      state: formValue(f, 'state') || 'online',
+    };
+    let res;
+    const done = await run(btn, async () => { res = await api('PUT', '/api/bot/status', { status }); }, 'Status nije spremljen');
+    if (!done) return;
+    bot.status = (res && res.status) || status;
+    toast('success', 'Status je spremljen', status.text ? `Bot sada prikazuje: ${status.text}` : 'Bot više nema status.');
+    router();
+  };
 
   // ---------- Dashboard access ----------
   async function pageAccess(ctx) {

@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { AuditLogEvent, Collection } from 'discord.js';
 
-process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'jaankeza-antinuke-'));
+process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'npcutils-antinuke-'));
 const db = await import('../src/db.js');
 const antinuke = await import('../src/features/antinuke.js');
 db.load();

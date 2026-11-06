@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { ChannelType, Collection, OverwriteType } from 'discord.js';
 
-process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'jaankeza-clone-'));
+process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'npcutils-clone-'));
 const db = await import('../src/db.js');
 const { cloneServer, plan } = await import('../src/features/clone.js');
 db.load();

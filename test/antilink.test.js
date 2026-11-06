@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { Collection } from 'discord.js';
 
-process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'jaankeza-antilink-'));
+process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'npcutils-antilink-'));
 const db = await import('../src/db.js');
 const antilink = await import('../src/features/antilink.js');
 db.load();

@@ -1,13 +1,14 @@
 import { EmbedBuilder, InteractionContextType, MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { COLOR } from '../utils/helpers.js';
 
-export const data = new SlashCommandBuilder().setName('help').setDescription('Popis svih Jaankeza Utils komandi')
+export const data = new SlashCommandBuilder().setName('help').setDescription('Popis svih komandi bota')
   .setContexts(InteractionContextType.Guild);
 
 export async function execute(interaction) {
+  const botName = interaction.client.user.username;
   const embed = new EmbedBuilder()
     .setColor(COLOR)
-    .setTitle('🤖 Jaankeza Utils — komande')
+    .setTitle(`🤖 ${botName} — komande`)
     .setThumbnail(interaction.client.user.displayAvatarURL())
     .addFields(
       { name: '📊 Statistika', value: '`/stats setup` • `/stats refresh` • `/stats remove`' },
@@ -28,7 +29,7 @@ export async function execute(interaction) {
       { name: '🛡️ Anti-nuke', value: '`/antinuke status` • `/antinuke ukljuci` • `/antinuke pravilo` • `/antinuke postavke` • `/antinuke whitelist`' },
       { name: '🔗 Zaštita od linkova', value: '`/antilink status` • `/antilink ukljuci` • `/antilink pravilo` • `/antilink obavijest` • `/antilink whitelist`' },
     )
-    .setFooter({ text: 'Jaankeza Utils' });
+    .setFooter({ text: botName });
   if (process.env.DASHBOARD_URL && process.env.CLIENT_SECRET) {
     embed.setDescription(`Sve se može podesiti i preko dashboarda: ${process.env.DASHBOARD_URL}`);
   }

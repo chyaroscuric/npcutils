@@ -1,10 +1,10 @@
-# 🤖 Jaankeza Utils
+# 🤖 Discord Utils Bot
 
 Custom Discord bot napravljen u [discord.js](https://discord.js.org) v14.
 
 | Feature | Što radi |
 | --- | --- |
-| 🟢 **Uvijek aktivan** | Status `discord.gg/jaankeza`, auto-reconnect, ne pada na greškama, Docker / pm2 restart, keep-alive HTTP endpoint |
+| 🟢 **Uvijek aktivan** | Status se postavlja na dashboardu, auto-reconnect, ne pada na greškama, Docker / pm2 restart, keep-alive HTTP endpoint |
 | 📊 **Stats kanali** | Kanali na vrhu servera: `👥 Članovi`, `🤖 Botovi`, `🚀 Boostovi` — ažuriraju se sami |
 | 🎫 **Tiketi** | Panel s gumbom → privatni kanal → zatvaranje s transkriptom u log kanal |
 | 📨 **Invite counter** | Prati tko je koga pozvao (pravi / izašli / lažni / bonus), leaderboard |
@@ -25,7 +25,7 @@ Custom Discord bot napravljen u [discord.js](https://discord.js.org) v14.
 
 ## 1. Napravi bota na Discordu
 
-1. Idi na <https://discord.com/developers/applications> → **New Application** → ime: **Jaankeza Utils**.
+1. Idi na <https://discord.com/developers/applications> → **New Application** → upiši ime svog bota (ime i slika se preuzimaju s Discord računa bota).
 2. **Bot** tab:
    - **Reset Token** → kopiraj token (treba za `.env`).
    - Uključi **Privileged Gateway Intents**:
@@ -38,7 +38,7 @@ Custom Discord bot napravljen u [discord.js](https://discord.js.org) v14.
    ```
 
 4. **OAuth2** tab (za dashboard): kopiraj **Client Secret** i pod **Redirects** dodaj `<DASHBOARD_URL>/callback`, npr. `http://localhost:3000/callback` ili `https://bot.tvojadomena.com/callback`.
-5. ⚠️ U **Server Settings → Roles** pomakni rolu **Jaankeza Utils** **iznad** svih rola koje bot treba davati (Member, reaction role…). Bot ne može dati rolu koja je iznad njegove.
+5. ⚠️ U **Server Settings → Roles** pomakni rolu bota **iznad** svih rola koje bot treba davati (Member, reaction role…). Bot ne može dati rolu koja je iznad njegove.
 
 ## 2. Pokretanje
 
@@ -62,7 +62,7 @@ U `.env` upiši:
 npm start
 ```
 
-Kad u konzoli piše `✅ Jaankeza Utils#xxxx je online`, bot radi. Sve postavke spremaju se u `data/db.json`.
+Kad u konzoli piše `✅ ime-bota#xxxx je online`, bot radi. Sve postavke spremaju se u `data/db.json`.
 
 ## 3. Da bude uvijek aktivan (24/7)
 
@@ -99,6 +99,8 @@ Dashboard je web stranica na kojoj se prijaviš Discordom i podesiš sve bez kom
 3. Pokreni bota i otvori `DASHBOARD_URL`.
 
 Na dashboardu vidiš servere na kojima je bot i na kojima si **vlasnik** ili te je vlasnik dodao pod **Pristup dashboardu**. Obični admini bez tog dodatka ne mogu otvoriti postavke servera. Vlasnik uvijek ima pristup i može dodati ili ukloniti članove; pristup prestaje odmah nakon uklanjanja. Boju sučelja mijenjaš pod **Izgled** (dolje lijevo).
+
+Ime i slika bota dolaze direktno s Discord računa bota (token), pa ih mijenjaš u Developer Portalu. **Status bota** (tekst, vrsta i online stanje) mijenjaš na početnoj stranici dashboarda; tu postavku može mijenjati samo vlasnik bota.
 
 > Ako dashboard ide na internet, stavi ga iza HTTPS-a (npr. Cloudflare Tunnel ili nginx) i u `DASHBOARD_URL` upiši `https://...`.
 

@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'jaankeza-games-'));
+process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'npcutils-games-'));
 const { COUNTRIES, CONTINENTS } = await import('../src/data/countries.js');
 const { WORDS } = await import('../src/data/words.js');
 const { isCorrect } = await import('../src/features/games/flags.js');

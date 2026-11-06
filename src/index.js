@@ -1,4 +1,4 @@
-import { ActivityType, Client, Events, GatewayIntentBits, MessageFlags, Partials } from 'discord.js';
+import { Client, Events, GatewayIntentBits, MessageFlags, Partials } from 'discord.js';
 import * as db from './db.js';
 import { loadCommands } from './loadCommands.js';
 import * as giveaways from './features/giveaways.js';
@@ -7,6 +7,7 @@ import * as members from './features/members.js';
 import * as music from './features/music.js';
 import * as antinuke from './features/antinuke.js';
 import * as antilink from './features/antilink.js';
+import * as botSettings from './features/botSettings.js';
 import * as games from './features/games/index.js';
 import { logActivity } from './features/activity.js';
 import { startDashboard } from './dashboard/server.js';
@@ -15,9 +16,6 @@ import * as reactionRoles from './features/reactionRoles.js';
 import { scheduleStatsUpdate } from './features/stats.js';
 import * as tickets from './features/tickets.js';
 import { UserError, fail } from './utils/helpers.js';
-
-const BOT_NAME = 'Jaankeza Utils';
-const STATUS = 'discord.gg/jaankeza';
 
 try {
   process.loadEnvFile();
@@ -46,10 +44,6 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.User, Partials.GuildMember],
-  presence: {
-    status: 'online',
-    activities: [{ name: STATUS, state: STATUS, type: ActivityType.Custom }],
-  },
 });
 
 // Runs an async handler and logs errors instead of crashing.
@@ -72,9 +66,9 @@ async function prepareGuild(guild) {
 client.once(Events.ClientReady, async () => {
   console.log(`✅ ${client.user.tag} je online na ${client.guilds.cache.size} server(a).`);
 
-  if (client.user.username !== BOT_NAME) {
-    await client.user.setUsername(BOT_NAME).catch((err) => console.warn('[name] Ne mogu promijeniti ime bota:', err.message));
-  }
+  // Needed so the dashboard knows who the bot owner is (global settings are owner-only).
+  await client.application.fetch().catch((err) => console.warn('[application]', err.message));
+  await botSettings.applyStatus(client);
 
   const body = [...commands.values()].map((c) => c.data.toJSON());
   try {

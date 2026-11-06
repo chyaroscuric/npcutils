@@ -16,6 +16,12 @@ export function load() {
     data = JSON.parse(fs.readFileSync(FILE, 'utf8'));
   }
   data.guilds ??= {};
+  data.bot ??= {};
+}
+
+export function bot() {
+  data.bot ??= {};
+  return data.bot;
 }
 
 export function guild(guildId) {

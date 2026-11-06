@@ -1,7 +1,7 @@
 services:
-  jaankeza-utils:
+  npcutils:
     build: .
-    container_name: jaankeza-utils
+    container_name: npcutils
     restart: unless-stopped # bot se sam ponovno pokrene nakon pada ili restarta servera
     env_file: .env
     ports:
