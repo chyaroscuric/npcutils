@@ -1,5 +1,7 @@
 // Web dashboard: Discord login + JSON API used by public/app.js. Also serves /health for uptime monitors.
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { ChannelType, PermissionFlagsBits } from 'discord.js';
@@ -127,10 +129,38 @@ export function startDashboard(client, port) {
     res.redirect('/');
   });
 
-  // Dashboard files change together with the bot, so let the browser revalidate them
-  // instead of keeping an old app.js for an hour.
-  app.use(express.static(fileURLToPath(new URL('./public/', import.meta.url)), {
-    index: 'index.html',
+  // Dashboard files change together with the bot. Serve index.html with a versioned
+  // app.js/app.css URL so browsers and CDNs (Cloudflare) cannot keep an old dashboard.
+  const publicDir = fileURLToPath(new URL('./public/', import.meta.url));
+  const indexFile = path.join(publicDir, 'index.html');
+  const assetVersion = () => {
+    try {
+      const js = fs.statSync(path.join(publicDir, 'app.js')).mtimeMs;
+      const css = fs.statSync(path.join(publicDir, 'app.css')).mtimeMs;
+      return String(Math.max(js, css));
+    } catch {
+      return '1';
+    }
+  };
+  const noStore = (res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.setHeader('CDN-Cache-Control', 'no-store');
+    res.setHeader('Surrogate-Control', 'no-store');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  };
+  app.get(['/', '/index.html'], (req, res) => {
+    try {
+      const html = fs.readFileSync(indexFile, 'utf8').replaceAll('__ASSET_VERSION__', assetVersion());
+      noStore(res);
+      res.type('html').send(html);
+    } catch (err) {
+      console.error('[dashboard] index.html', err.message);
+      res.status(500).send('Dashboard nije dostupan.');
+    }
+  });
+  app.use(express.static(publicDir, {
+    index: false,
     maxAge: 0,
     etag: true,
     setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache'),
