@@ -50,7 +50,7 @@ const messageUrl = (guildId, channelId, messageId) =>
   `https://discord.com/channels/${guildId}/${channelId}${messageId ? `/${messageId}` : ''}`;
 
 export function startDashboard(client, port) {
-  const { CLIENT_SECRET } = process.env;
+  const { CLIENT_SECRET, MANAGER_SECRET } = process.env;
   const baseUrl = (process.env.DASHBOARD_URL || `http://localhost:${port}`).replace(/\/$/, '');
   const secureCookies = baseUrl.startsWith('https://');
   const app = express();
@@ -62,9 +62,9 @@ export function startDashboard(client, port) {
     res.status(online ? 200 : 503).json({ bot: client.user?.username ?? null, online, ping: client.ws.ping, uptime: client.uptime });
   });
 
-  if (!CLIENT_SECRET) {
+  if (!CLIENT_SECRET && !MANAGER_SECRET) {
     console.warn('[dashboard] CLIENT_SECRET nije postavljen, dashboard je isključen (radi samo /health).');
-    app.listen(port, () => console.log(`Health endpoint na portu ${port}`));
+    app.listen(port, process.env.HOST || undefined, () => console.log(`Health endpoint na portu ${port}`));
     return;
   }
 
@@ -171,6 +171,16 @@ export function startDashboard(client, port) {
   api.use(express.json({ limit: '100kb' }));
 
   api.use((req, res, next) => {
+    // When running behind the BYOT manager, the manager authenticates the user and
+    // forwards their Discord ID. The bot's own OAuth session is not used.
+    if (MANAGER_SECRET) {
+      if (req.get('X-Manager-Secret') !== MANAGER_SECRET) return res.status(401).json({ error: 'Neovlašten pristup.' });
+      const userId = req.get('X-Discord-User');
+      if (!userId) return res.status(401).json({ error: 'Nisi prijavljen/a.' });
+      if (req.method !== 'GET' && req.get('X-Dashboard') !== '1') return res.status(403).json({ error: 'Neispravan zahtjev.' });
+      req.userId = userId;
+      return next();
+    }
     const sid = parseCookies(req.headers.cookie).sid;
     const session = sid && sessions.get(sid);
     if (!session || session.expires < Date.now()) {
@@ -182,11 +192,13 @@ export function startDashboard(client, port) {
     next();
   });
 
-  // The owner always has access; everyone else must be added by the owner on the dashboard.
+  // The BYOT bot owner manages every guild the bot is in. Guild owners and users
+  // explicitly added on the dashboard manage their own guild.
+  const isBotOwner = (userId) => Boolean(process.env.BOT_OWNER_ID) && userId === process.env.BOT_OWNER_ID;
   const isDashboardUser = (guild, userId) =>
-    guild.ownerId === userId || db.guild(guild.id).config.dashboardUsers.includes(userId);
+    isBotOwner(userId) || guild.ownerId === userId || db.guild(guild.id).config.dashboardUsers.includes(userId);
   const hasDashboardAccess = (guild, userId) =>
-    guild.ownerId === userId || (isDashboardUser(guild, userId) && guild.members.cache.has(userId));
+    isBotOwner(userId) || guild.ownerId === userId || (isDashboardUser(guild, userId) && guild.members.cache.has(userId));
 
   const manageableGuilds = (userId) => client.guilds.cache.filter((g) => isDashboardUser(g, userId));
 
@@ -237,11 +249,11 @@ export function startDashboard(client, port) {
     const guild = client.guilds.cache.get(gid);
     if (!guild) return res.status(403).json({ error: 'Nemaš pristup ovom serveru.' });
     const member = guild.members.cache.get(req.userId) ?? (await guild.members.fetch(req.userId).catch(() => null));
-    if (!member || !hasDashboardAccess(guild, req.userId)) {
+    if (!hasDashboardAccess(guild, req.userId) || (!member && !isBotOwner(req.userId))) {
       return res.status(403).json({ error: 'Nemaš pristup ovom serveru. Vlasnik servera te mora dodati na dashboard.' });
     }
     req.guild = guild;
-    req.member = member;
+    req.member = member ?? guild.members.me;
     req.g = db.guild(guild.id);
     next();
   });
@@ -348,13 +360,13 @@ export function startDashboard(client, port) {
   api.get('/guilds/:gid/access', (req, res) => {
     const ids = req.g.config.dashboardUsers.filter((id) => id !== req.guild.ownerId);
     res.json({
-      canEdit: req.guild.ownerId === req.userId,
+      canEdit: req.guild.ownerId === req.userId || isBotOwner(req.userId),
       owner: userInfo(req.guild, req.guild.ownerId),
       users: ids.map((id) => userInfo(req.guild, id)),
     });
   });
   api.put('/guilds/:gid/access', async (req, res) => {
-    if (req.guild.ownerId !== req.userId) throw new UserError('Pristup dashboardu može mijenjati samo vlasnik servera.');
+    if (req.guild.ownerId !== req.userId && !isBotOwner(req.userId)) throw new UserError('Pristup dashboardu može mijenjati samo vlasnik servera ili vlasnik bota.');
     const ids = Array.isArray(req.body?.userIds) ? [...new Set(req.body.userIds.map(String))] : [];
     if (ids.length > 50) throw new UserError('Najviše 50 članova može imati pristup dashboardu.');
     const clean = [];
@@ -818,7 +830,7 @@ export function startDashboard(client, port) {
   });
 
   app.use('/api', api);
-  app.listen(port, () => console.log(`🌐 Dashboard: ${baseUrl}`));
+  app.listen(port, process.env.HOST || undefined, () => console.log(`🌐 Dashboard: ${baseUrl}`));
 
   // forget expired sessions
   setInterval(() => {

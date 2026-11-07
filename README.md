@@ -21,9 +21,27 @@ Custom Discord bot napravljen u [discord.js](https://discord.js.org) v14.
 | 📋 **Kloniranje servera** | Kopira role, kanale, dozvole, profil, emojije i postavke bota s jednog servera na drugi |
 | 🛡️ **Anti-nuke** | Kažnjava i vraća masovne banove, kickove, brisanje kanala/rola, dodavanje botova… |
 | 🔗 **Zaštita od linkova** | Briše poruke s linkovima i Discord pozivnicama članovima bez moderatorskih dozvola. |
-| 🌐 **Dashboard** | Web stranica s Discord prijavom — sve gore navedeno podesiš iz browsera, bez komandi |
+| 🌐 **BYOT Dashboard** | Jedan panel, više botova: svatko doda svoj token i dobije isti panel; tokeni su enkriptirani |
 
 ---
+
+## 🔑 BYOT (Bring Your Own Token)
+
+Panel je sada multi-bot: svatko se prijavi Discordom, doda **svoj bot token** i dobije isti dashboard za svog bota. Svaki bot radi u **zasebnom procesu** i ima svoj `DATA_DIR`, pa se podaci, postavke i baze ne miješaju.
+
+- Tokeni se čuvaju **AES-256-GCM enkriptirani**; nakon spremanja se više ne prikazuju.
+- Samo vlasnik bota vidi svoj bot na panelu.
+- Botove možeš pokretati, zaustavljati, restartati, gledati logove i brisati.
+- Panel bota je na `https://tvoja-domena/b/<botId>/`.
+- Stari način rada s jednim botom ostaje dostupan s `npm run start:bot`.
+
+Za panel treba **zasebna Discord OAuth aplikacija** (može biti ista aplikacija kao bot):
+- `CLIENT_ID` — Application ID
+- `CLIENT_SECRET` — OAuth2 Client Secret
+- `DASHBOARD_URL` — javna adresa panela, npr. `https://utils.tvojadomena.com`
+- u Developer Portalu → OAuth2 → Redirects dodaj `<DASHBOARD_URL>/callback`
+
+Ako želiš automatski uvesti postojećeg bota iz `.env`, postavi `DISCORD_TOKEN` i `BOT_OWNER_ID` (tvoj Discord ID). Inače ostavi prazno i dodaj bota kroz panel.
 
 ## 1. Napravi bota na Discordu
 
@@ -56,15 +74,15 @@ cp .env.example .env
 
 U `.env` upiši:
 
-- `DISCORD_TOKEN` — token bota
-- `PORT`, `CLIENT_SECRET`, `DASHBOARD_URL` — za dashboard (vidi [Dashboard](#-dashboard))
+- `CLIENT_ID`, `CLIENT_SECRET`, `DASHBOARD_URL` — za BYOT panel (vidi [BYOT](#-byot-bring-your-own-token))
+- po želji `DISCORD_TOKEN` + `BOT_OWNER_ID` — automatski uvoz postojećeg bota
 - po želji `GUILD_ID` — ID tvog servera, tada se slash komande pojave odmah
 
 ```bash
 npm start
 ```
 
-Kad u konzoli piše `✅ ime-bota#xxxx je online`, bot radi. Sve postavke spremaju se u `data/db.json`.
+`npm start` pokreće **BYOT panel**. Otvori `DASHBOARD_URL`, prijavi se Discordom i dodaj bot token. Ako želiš stari način s jednim botom iz `.env`, pokreni `npm run start:bot`.
 
 ## 3. Da bude uvijek aktivan (24/7)
 

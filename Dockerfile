@@ -12,4 +12,4 @@ COPY src ./src
 VOLUME ["/app/data"]
 EXPOSE 3000
 # update yt-dlp on every start, YouTube changes often
-CMD ["sh", "-c", "yt-dlp -U >/dev/null 2>&1; node src/index.js"]
+CMD ["sh", "-c", "yt-dlp -U >/dev/null 2>&1; node src/manager/index.js"]

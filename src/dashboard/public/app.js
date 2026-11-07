@@ -4,6 +4,20 @@
 (() => {
   'use strict';
 
+  // The BYOT manager serves each bot panel under /b/<botId>/. <base> makes all
+  // relative URLs (API, login, logout, assets) stay inside that prefix.
+  const BASE = (() => {
+    const el = document.querySelector('base');
+    if (!el) return '/';
+    try {
+      const path = new URL(el.href).pathname;
+      return path.endsWith('/') ? path : `${path}/`;
+    } catch {
+      return '/';
+    }
+  })();
+  const appUrl = (path) => `${BASE}${String(path).replace(/^\/+/, '')}`;
+
   /* =====================================================================
    * 1. Accent theming (spec section 3)
    * ===================================================================== */
@@ -277,7 +291,7 @@
     }
     let res;
     try {
-      res = await fetch(path, opts);
+      res = await fetch(appUrl(path), opts);
     } catch {
       throw new ApiError('Nema veze sa serverom. Provjeri internetsku vezu i pokušaj ponovno.', 0);
     }
@@ -956,7 +970,7 @@
         ${avatar(bot.avatarUrl, name, 'avatar-xl')}
         <h1>${name}</h1>
         <p>Prijavi se Discord računom da upravljaš serverima na kojima je bot.</p>
-        <a class="btn btn-primary" href="/login">${icon('ti-brand-discord')}Prijavi se s Discordom</a>
+        <a class="btn btn-primary" href="${appUrl('login')}">${icon('ti-brand-discord')}Prijavi se s Discordom</a>
       </div>
     </main>`);
   }
@@ -1019,7 +1033,7 @@
           <div class="truncate"><div class="user-name truncate">${u.displayName || u.username}</div><div class="user-sub truncate">@${u.username}</div></div>
         </div>
         <button type="button" class="nav-row" data-action="appearance">${icon('ti-palette')}Izgled</button>
-        <a class="nav-row" href="/logout">${icon('ti-logout')}Odjava</a>
+        <a class="nav-row" href="${appUrl('logout')}">${icon('ti-logout')}Odjava</a>
       </div>`);
     mount($('#topbar-title'), guild
       ? html`${avatar(guild.iconUrl, guild.name, 'avatar-sm avatar-guild')}<span class="truncate">${guild.name}</span>`
