@@ -48,9 +48,10 @@ Ako želiš automatski uvesti postojećeg bota iz `.env`, postavi `DISCORD_TOKEN
 1. Idi na <https://discord.com/developers/applications> → **New Application** → upiši ime svog bota (ime i slika se preuzimaju s Discord računa bota).
 2. **Bot** tab:
    - **Reset Token** → kopiraj token (treba za `.env`).
-   - Uključi **Privileged Gateway Intents**:
+   - Uključi **sva 3 Privileged Gateway Intents** (bez njih bot neće raditi kako treba):
+     - ✅ **Presence Intent**
      - ✅ **Server Members Intent** (welcome, autorole, invite counter, stats)
-     - ✅ **Message Content Intent** (transkripti tiketa)
+     - ✅ **Message Content Intent** (transkripti tiketa, leveli, anti-link, brojanje)
 3. Pozovi bota na server (zamijeni `CLIENT_ID` s **Application ID** iz *General Information*):
 
    ```

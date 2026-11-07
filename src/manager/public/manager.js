@@ -88,7 +88,7 @@
                   <div class="field">
                     <label class="label" for="token">Bot token</label>
                     <input class="input" id="token" name="token" type="password" autocomplete="off" spellcheck="false" placeholder="MTIz...">
-                    <p class="help">Discord Developer Portal → Bot → Reset Token.</p>
+                    <p class="help">Discord Developer Portal → Bot → Reset Token. Prije dodavanja uključi <strong>sva 3 Privileged Gateway Intents</strong>: <strong>Presence</strong>, <strong>Server Members</strong> i <strong>Message Content</strong>.</p>
                   </div>
                 </div>
                 <div class="form-actions"><button class="btn btn-primary" type="submit">${icon('ti-plus')}Dodaj bota</button></div>
@@ -100,6 +100,10 @@
             </section>
           </div>
           <div class="stack">
+            <aside class="callout callout-warning">${icon('ti-alert-triangle')}<div>
+              <p class="callout-title">Uključi sva 3 Gateway Intents</p>
+              <p class="callout-body">U Discord Developer Portalu → Bot uključi <strong>Presence Intent</strong>, <strong>Server Members Intent</strong> i <strong>Message Content Intent</strong>. Bez sva tri bota neće raditi kako treba.</p>
+            </div></aside>
             <aside class="callout callout-info">${icon('ti-info-circle')}<div>
               <p class="callout-title">Kako radi BYOT</p>
               <p class="callout-body">Ti daješ svoj token, panel pokreće bota u zasebnom procesu. Podaci, postavke i baze su odvojeni za svakog bota.</p>
