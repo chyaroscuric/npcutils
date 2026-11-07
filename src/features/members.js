@@ -8,6 +8,7 @@ import { normalizeBanner, renderWelcomeBanner } from './welcomeBanner.js';
 export const DEFAULT_WELCOME =
   'Dobrodošao/la {user} na **{server}**! 🎉\nTi si naš **{memberCount}.** član.\nPozvao/la te: {inviter}';
 export const DEFAULT_BOOST = 'Hvala {user} što je boostao/la **{server}**! 💜\nServer sada ima **{boosts}** boostova (level {level}).';
+export const DEFAULT_GOODBYE = '👋 **{username}** je napustio/la **{server}**.\nOstalo nas je **{memberCount}**.';
 
 export async function giveAutoroles(member) {
   const g = db.guild(member.guild.id);
@@ -76,6 +77,40 @@ export async function sendWelcome(member, inviterId) {
   const channel = cfg?.channelId && member.guild.channels.cache.get(cfg.channelId);
   if (!channel) return;
   await channel.send(await buildWelcomePayload(member, inviterId));
+}
+
+export function goodbyePayload(member) {
+  const g = db.guild(member.guild.id);
+  const cfg = g.config.goodbye;
+  const inviterId = g.joins[member.id]?.inviterId ?? null;
+  const inviterStats = inviterId ? invites.stats(g, inviterId) : null;
+  const username = member.user?.username ?? 'Nepoznat član';
+  const joined = member.joinedTimestamp ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : 'nepoznato';
+  const text = fillTemplate(cfg?.message || DEFAULT_GOODBYE, {
+    user: username,
+    username,
+    server: member.guild.name,
+    memberCount: member.guild.memberCount,
+    inviter: inviterId ? `<@${inviterId}>` : 'nepoznato',
+    invites: inviterStats?.total ?? 0,
+    joined,
+  });
+  const embed = new EmbedBuilder()
+    .setColor(0x747f8d)
+    .setAuthor({ name: member.guild.name, iconURL: member.guild.iconURL() ?? undefined })
+    .setTitle('👋 Član je otišao')
+    .setDescription(text)
+    .setTimestamp();
+  if (member.user?.displayAvatarURL) embed.setThumbnail(member.user.displayAvatarURL({ size: 256 }));
+  if (cfg?.imageUrl) embed.setImage(cfg.imageUrl);
+  return { embeds: [embed], allowedMentions: { parse: [] } };
+}
+
+export async function sendGoodbye(member) {
+  const cfg = db.guild(member.guild.id).config.goodbye;
+  const channel = cfg?.channelId && member.guild.channels.cache.get(cfg.channelId);
+  if (!channel) return;
+  await channel.send(goodbyePayload(member));
 }
 
 export function boostPayload(member) {

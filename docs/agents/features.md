@@ -12,10 +12,13 @@ and own their guild state. Commands and the dashboard call into them.
 - `buildWelcomePayload(member, inviterId)` renders the optional auto banner and falls
   back to the embed if rendering fails.
 - `sendWelcome(member, inviterId)` sends to `config.welcome.channelId`.
+- `goodbyePayload(member)` / `sendGoodbye(member)` build and send the leave message to
+  `config.goodbye.channelId`.
 - `boostPayload(member)` / `onMemberUpdate()` handle boost messages.
 
-Placeholders: `{user}`, `{username}`, `{server}`, `{memberCount}`, `{inviter}`,
-`{invites}`; `\n` becomes a newline via `fillTemplate`.
+Placeholders for welcome: `{user}`, `{username}`, `{server}`, `{memberCount}`, `{inviter}`,
+`{invites}`. Goodbye adds `{joined}`; `{user}` is the username (no ping for a member who
+left). `\n` becomes a newline via `fillTemplate`.
 
 ### `welcomeBanner.js`
 
@@ -176,6 +179,37 @@ Similarity combines:
 This is deliberately offline and deterministic; there is no embedding API. Extend
 `src/data/semantic.js` to make more words feel related. `similarity()` returns an integer
 0–100, `similarityLabel()` returns the emoji label and `similarityBar()` the 10-block bar.
+
+### `games/mafia.js`
+
+`/mafia start|stop|stats`: a button/select-menu social deduction game.
+
+- Lobby: host + join/leave/start/cancel buttons, minimum 4 and maximum 15 players,
+  five-minute inactivity timeout.
+- Roles: mafia, detective, doctor, dama (blocks one night action) and citizen.
+  Distribution: 1 mafia at 4–5 players, 2 at 6–8, 3 at 9+; detective and doctor always,
+  dama from 6 players.
+- Night: role holders open an ephemeral select menu from **Izvrši akciju**; the mafia
+  votes a kill, the doctor protects, the detective investigates (DM result), the dama
+  blocks. Night resolves after 60 seconds.
+- Day: 90-second discussion, then a 60-second vote. Ties or no votes mean no elimination.
+- Win: mafia wins at parity, town wins when no mafia remain.
+- Points: winners +35, losers -3, persisted in `g.mafiaScores`.
+- State is in memory (`Map` by channel ID), so a restart cancels running games.
+- Components use the `mafia:` prefix; string-select menus are routed in `bot.js`.
+
+### `games/fishing.js`
+
+`/fish` and the `fish:` buttons:
+
+- `catchFish(guildId, userId, { now, random })` catches 1–3 weighted random fish,
+  adds them to `g.fishing.users[userId].inventory`, grants XP and a 2-second cooldown.
+- `sellAll()` turns the whole inventory into coins and clears it.
+- Rarity table: junk, common, uncommon, rare, epic, legendary. Values and XP scale with
+  rarity; the best catch is stored.
+- `fishPayload` / `soldPayload` / `closedPayload` build the Discord embeds and the
+  **Pecaj ponovno**, **Prodaj sve**, **Natrag** buttons.
+- XP/level are independent of the levels feature (`levelForXp` / `xpForLevel`).
 
 ### `games/ship.js`
 

@@ -9,7 +9,7 @@ import * as db from '../db.js';
 import { recentActivity } from '../features/activity.js';
 import * as giveaways from '../features/giveaways.js';
 import * as invites from '../features/invites.js';
-import { DEFAULT_BOOST, DEFAULT_WELCOME, boostPayload, buildWelcomePayload } from '../features/members.js';
+import { DEFAULT_BOOST, DEFAULT_GOODBYE, DEFAULT_WELCOME, boostPayload, buildWelcomePayload, goodbyePayload } from '../features/members.js';
 import { normalizeBanner } from '../features/welcomeBanner.js';
 import * as music from '../features/music.js';
 import * as antinuke from '../features/antinuke.js';
@@ -324,6 +324,13 @@ export function startDashboard(client, port) {
           imageUrl: g.config.boost?.imageUrl ?? null,
           defaultMessage: DEFAULT_BOOST,
         },
+        goodbye: {
+          enabled: Boolean(g.config.goodbye),
+          channelId: g.config.goodbye?.channelId ?? null,
+          message: g.config.goodbye?.message ?? '',
+          imageUrl: g.config.goodbye?.imageUrl ?? null,
+          defaultMessage: DEFAULT_GOODBYE,
+        },
         autoroles: g.config.autoroles ?? [],
         stats: {
           enabled: Boolean(statsCfg),
@@ -392,7 +399,7 @@ export function startDashboard(client, port) {
   });
 
   // ---------- welcome / boost / autoroles ----------
-  for (const kind of ['welcome', 'boost']) {
+  for (const kind of ['welcome', 'boost', 'goodbye']) {
     api.put(`/guilds/:gid/${kind}`, (req, res) => {
       const { enabled, channelId, message, imageUrl, banner } = req.body ?? {};
       if (!enabled) delete req.g.config[kind];
@@ -412,7 +419,9 @@ export function startDashboard(client, port) {
       if (!channel) throw new UserError('Prvo uključi i spremi poruku.');
       const payload = kind === 'welcome'
         ? await buildWelcomePayload(req.member, req.g.joins[req.userId]?.inviterId ?? null)
-        : boostPayload(req.member);
+        : kind === 'goodbye'
+          ? goodbyePayload(req.member)
+          : boostPayload(req.member);
       await channel.send(payload).catch(() => {
         throw new UserError(`Ne mogu slati poruke u #${channel.name}.`);
       });

@@ -1536,6 +1536,7 @@
       : `Razina ${g.boostTier} · najviša razina`;
     const modules = [
       { page: 'welcome', name: 'Poruka dobrodošlice', on: c.welcome.enabled, meta: c.welcome.enabled ? chan(c.welcome.channelId) : 'Novi članovi ne dobivaju poruku' },
+      { page: 'welcome', name: 'Poruka odlaska', on: c.goodbye.enabled, meta: c.goodbye.enabled ? chan(c.goodbye.channelId) : 'Odlazak se ne objavljuje' },
       { page: 'welcome', name: 'Poruka za boost', on: c.boost.enabled, meta: c.boost.enabled ? chan(c.boost.channelId) : 'Boostovi se ne objavljuju' },
       { page: 'welcome', name: 'Automatske role', on: c.autoroles.length > 0, meta: c.autoroles.length ? count(c.autoroles.length, 'rola', 'role', 'rola') : 'Nema automatskih rola' },
       { page: 'stats', name: 'Kanali statistike', on: c.stats.enabled, meta: c.stats.enabled ? 'Članovi, botovi i boostovi' : 'Nisu postavljeni' },
@@ -1623,10 +1624,19 @@
     ['{boosts}', 'Ukupan broj boostova'],
     ['{level}', 'Razina boosta servera'],
   ];
+  const GOODBYE_VARS = [
+    ['{user}', 'Korisničko ime člana koji je otišao'],
+    ['{username}', 'Korisničko ime, bez spominjanja'],
+    ['{server}', 'Ime servera'],
+    ['{memberCount}', 'Broj članova nakon odlaska'],
+    ['{inviter}', 'Tko je pozvao člana'],
+    ['{invites}', 'Koliko invite-ova ima pozivatelj'],
+    ['{joined}', 'Kad se član pridružio (Discord vrijeme)'],
+  ];
   let welcomeTab = 'welcome';
 
   async function pageWelcome(ctx) {
-    ctx.head = pageHead('Dobrodošlica i role', 'Poruke za nove članove i boostove te role koje novi članovi dobiju automatski.');
+    ctx.head = pageHead('Dobrodošlica i role', 'Poruke za nove članove, odlaske i boostove te role koje novi članovi dobiju automatski.');
     mount(ctx.el, html`${ctx.head}<div class="skel" style="height:60px;margin-bottom:24px;border-radius:16px"></div><div class="cols cols-form-right">${skelCard(480)}${skelCard(320)}</div>`);
     const g = await ctx.load(() => guildData(ctx.gid));
     if (!g) return;
@@ -1636,7 +1646,7 @@
   }
   function drawWelcome() {
     const { g, ctx } = state.page;
-    const tabs = [['welcome', 'Dobrodošlica'], ['boost', 'Boost'], ['autoroles', 'Automatske role']];
+    const tabs = [['welcome', 'Dobrodošlica'], ['goodbye', 'Odlazak'], ['boost', 'Boost'], ['autoroles', 'Automatske role']];
     mount(ctx.el, html`${ctx.head}
       <div class="tabs" role="tablist" aria-label="Odjeljci">
         ${tabs.map(([k, l]) => html`<button type="button" class="tab" role="tab" id="tab-${k}" aria-controls="tabpanel" aria-selected="${String(k === welcomeTab)}" tabindex="${k === welcomeTab ? 0 : -1}" data-action="welcome-tab" data-tab="${k}">${l}</button>`)}
@@ -1671,17 +1681,21 @@
   function messagePanel(g, kind) {
     const c = g.config[kind];
     const isW = kind === 'welcome';
-    const vars = isW ? WELCOME_VARS : BOOST_VARS;
+    const isG = kind === 'goodbye';
+    const vars = isW ? WELCOME_VARS : isG ? GOODBYE_VARS : BOOST_VARS;
+    const title = isW ? 'Poruka dobrodošlice' : isG ? 'Poruka odlaska' : 'Poruka za boost';
+    const desc = isW ? 'Bot je šalje kad netko uđe na server.' : isG ? 'Bot je šalje kad netko napusti server.' : 'Bot je šalje kad netko boosta server.';
+    const toggleLabel = isW ? 'Šalji poruku dobrodošlice' : isG ? 'Šalji poruku odlaska' : 'Šalji poruku za boost';
     const id = { ch: uid('f'), msg: uid('f'), img: uid('f'), banner: uid('f'), btitle: uid('f'), bsub: uid('f'), bacc: uid('f'), bname: uid('f') };
     const banner = isW ? (c.banner || {}) : {};
     return html`<div class="cols cols-form-right">
       <section class="card" aria-labelledby="msg-h">
-        <div class="card-head"><div><h2 class="card-title" id="msg-h">${isW ? 'Poruka dobrodošlice' : 'Poruka za boost'}</h2>
-          <p class="card-desc">${isW ? 'Bot je šalje kad netko uđe na server.' : 'Bot je šalje kad netko boosta server.'}</p></div>${statusBadge(c.enabled)}</div>
+        <div class="card-head"><div><h2 class="card-title" id="msg-h">${title}</h2>
+          <p class="card-desc">${desc}</p></div>${statusBadge(c.enabled)}</div>
         <form class="form" data-form="msg" data-kind="${kind}" novalidate>
           <div class="fields">
             <label class="toggle"><input type="checkbox" role="switch" name="enabled" ${c.enabled ? raw('checked') : ''}><span class="track" aria-hidden="true"></span>
-              <span>${isW ? 'Šalji poruku dobrodošlice' : 'Šalji poruku za boost'}</span></label>
+              <span>${toggleLabel}</span></label>
             ${field({ name: 'channelId', label: 'Kanal', id: id.ch, required: true,
               control: selectField({ id: id.ch, name: 'channelId', options: textChannelOptions(g), value: c.channelId, placeholder: 'Odaberi kanal', emptyText: 'Server nema tekstualnih kanala.' }) })}
             <div class="field" data-field="message">
@@ -1733,6 +1747,9 @@
   function sampleValues(kind) {
     const { g } = state.page;
     const u = state.me.user;
+    if (kind === 'goodbye') {
+      return { user: u.username, username: u.username, server: g.name, memberCount: fmtNum(Math.max(0, g.memberCount - 1)), inviter: { mention: '@Marko' }, invites: '12', joined: 'prije 3 mjeseca' };
+    }
     return kind === 'welcome'
       ? { user: { mention: `@${u.displayName || u.username}` }, username: u.username, server: g.name, memberCount: fmtNum(g.memberCount), inviter: { mention: '@Marko' }, invites: '12' }
       : { user: { mention: `@${u.displayName || u.username}` }, username: u.username, server: g.name, boosts: String(g.boostCount), level: String(g.boostTier) };
@@ -1810,7 +1827,7 @@
     f.dataset.snap = msgSnapshot(f);
     const badge = $('#msg-h')?.parentElement?.nextElementSibling;
     if (badge) badge.outerHTML = statusBadge(body.enabled).s;
-    toast('success', 'Promjene su spremljene', kind === 'welcome' ? 'Poruka dobrodošlice je ažurirana.' : 'Poruka za boost je ažurirana.');
+    toast('success', 'Promjene su spremljene', kind === 'welcome' ? 'Poruka dobrodošlice je ažurirana.' : kind === 'goodbye' ? 'Poruka odlaska je ažurirana.' : 'Poruka za boost je ažurirana.');
   };
   actions['msg-test'] = async (btn) => {
     const f = btn.closest('form');
@@ -3510,6 +3527,8 @@
     ['Wordle', '/wordle', '', 'Pogodi riječ od 5 slova u 6 pokušaja.'],
     ['Kaladont', '/kaladont', 'start | stop', 'Pokreće ili zaustavlja kaladont u kanalu u kojem upišeš naredbu.'],
     ['Toplo-hladno', '/toplohladno', 'start | stop', 'Pogodi tajnu rijec; bot za svaki pokusaj kaze koliko je blizu u postocima.'],
+    ['Mafija', '/mafia', 'start | stop | stats', 'Drustvena igra s ulogama: mafija, detektiv, doktor, dama i građani.'],
+    ['Pecanje', '/fish', '', 'Baci mrezu, ulovi ribu, skupljaj XP i prodaj ulov za novcice.'],
     ['Ship', '/ship', 'korisnik1 [korisnik2]', 'Pokazuje koliko su dvije osobe kompatibilne. Bez drugog korisnika uspoređuje tebe.'],
   ];
   async function pageGames(ctx) {

@@ -41,7 +41,7 @@ src/
   loadCommands.js          loads src/commands/*.js into a Map
   commands/                slash commands (one module or a `commands` array)
   features/                business logic, one module per feature
-    games/                 chat games (flags, wordle, kaladont, toplo-hladno, ship)
+    games/                 chat games (flags, wordle, kaladont, toplo-hladno, mafia, fishing, ship)
     ...
   data/                    static datasets (countries, words, semantic groups)
   dashboard/
@@ -129,3 +129,6 @@ design.md                  mandatory dashboard design system
   celebrated on Feb 28 in non-leap years.
 - The "toplo-hladno" similarity is offline: semantic groups in `src/data/semantic.js`
   plus edit distance. It is not a neural embedding.
+- Mafia game state is in memory. A bot restart cancels a running game; only
+  `g.mafiaScores` is persisted. Fishing inventory/XP/coins are persisted in
+  `g.fishing.users`.

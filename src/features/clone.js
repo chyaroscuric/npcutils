@@ -98,7 +98,7 @@ export function copyBotSettings(sourceId, targetId, roleMap, channelMap) {
   const role = (id) => (id ? roleMap.get(id) ?? null : null);
   const c = src.config;
   const config = {};
-  for (const key of ['welcome', 'boost']) {
+  for (const key of ['welcome', 'boost', 'goodbye']) {
     if (c[key] && ch(c[key].channelId)) config[key] = { ...c[key], channelId: ch(c[key].channelId) };
   }
   if (c.autoroles?.length) config.autoroles = c.autoroles.map(role).filter(Boolean);

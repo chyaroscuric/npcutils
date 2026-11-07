@@ -62,6 +62,9 @@ test('normalizer keeps old data', () => {
 | `clone.test.js` | role/channel mapping, destructive clone |
 | `counting.test.js` | correct/wrong numbers, reset |
 | `games.test.js` | flags, wordle, kaladont, dictionary, ship |
+| `fishing.test.js` | fish table, XP levels, catching, cooldown, selling |
+| `mafia.test.js` | role distribution and win conditions |
+| `members.test.js` | goodbye placeholders, default message, channel send |
 | `invites.test.js` | joins/leaves/fakes/bonus |
 | `levels.test.js` | XP formula, cooldown, voice, announcements |
 | `manager.test.js` | token encryption, bot store |

@@ -12,6 +12,8 @@ import * as botSettings from './features/botSettings.js';
 import * as counting from './features/counting.js';
 import * as levels from './features/levels.js';
 import * as games from './features/games/index.js';
+import * as fishing from './features/games/fishing.js';
+import * as mafia from './features/games/mafia.js';
 import * as socialAlerts from './features/socialAlerts.js';
 import { logActivity } from './features/activity.js';
 import { startDashboard } from './dashboard/server.js';
@@ -121,6 +123,7 @@ client.on(
   Events.GuildMemberRemove,
   safe('memberRemove', async (member) => {
     invites.onMemberLeave(member);
+    await members.sendGoodbye(member).catch((err) => console.error('[goodbye]', err));
     logActivity(member.guild.id, 'leave', `${member.user?.username ?? 'Netko'} je napustio/la server`);
     scheduleStatsUpdate(member.guild);
   }),
@@ -190,6 +193,8 @@ const componentHandlers = {
   giveaway: giveaways.handleComponent,
   music: music.handleComponent,
   ...games.componentHandlers,
+  mafia: mafia.handleComponent,
+  fish: fishing.handleComponent,
   clone: cloneCommand.handleComponent,
 };
 
@@ -202,7 +207,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       // Discord only waits 3 s for the first response; slow commands acknowledge first and edit later.
       if (command.deferEphemeral) await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       await command.execute(interaction);
-    } else if (interaction.isButton() || interaction.isModalSubmit()) {
+    } else if (interaction.isButton() || interaction.isModalSubmit() || interaction.isStringSelectMenu()) {
       await componentHandlers[interaction.customId.split(':')[0]]?.(interaction);
     }
   } catch (err) {

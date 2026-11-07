@@ -68,13 +68,13 @@ contexts fail fast.
 | Stats | `/stats server`, `/stats tiktok`, `/stats youtube`, `/stats twitch`, `/stats setup`, `/stats refresh`, `/stats remove` |
 | Tickets | `/ticket setup`, `/ticket panel`, `/ticket close`, `/ticket add`, `/ticket remove` |
 | Invites | `/invites`, `/leaderboard`, `/invitesadmin bonus`, `/invitesadmin reset` |
-| Welcome/boost | `/welcome set`, `/welcome test`, `/welcome off`, `/boost set`, `/boost test`, `/boost off` |
+| Welcome/boost | `/welcome set`, `/welcome test`, `/welcome off`, `/goodbye set`, `/goodbye test`, `/goodbye off`, `/boost set`, `/boost test`, `/boost off` |
 | Autorole | `/autorole add`, `/autorole remove`, `/autorole list` |
 | Birthdays | `/birthday postavi`, `/birthday ukloni`, `/birthday sljedeci`, `/birthday postavke`, `/birthday test`, `/birthday iskljuci` |
 | Reaction roles | `/reactionrole create`, `/reactionrole add`, `/reactionrole remove`, `/reactionrole list` |
 | Giveaways | `/giveaway start`, `/giveaway end`, `/giveaway reroll`, `/giveaway list`, `/giveaway delete` |
 | Music | `/play`, `/skip`, `/pause`, `/resume`, `/stop`, `/queue`, `/loop`, `/shuffle`, `/remove` |
-| Games | `/zastava`, `/wordle`, `/kaladont start\|stop`, `/toplohladno start\|stop`, `/ship`, `/counting ...` |
+| Games | `/zastava`, `/wordle`, `/kaladont start\|stop`, `/toplohladno start\|stop`, `/mafia start\|stop\|stats`, `/fish`, `/ship`, `/counting ...` |
 | Levels | `/rank`, `/top`, `/levels status\|ukljuci\|postavke\|reset` |
 | Messaging | `/posalji` |
 | Moderation | `/purge`, `/ban`, `/unban`, `/kick`, `/timeout`, `/untimeout`, `/warn`, `/warnings`, `/clearwarns`, `/slowmode`, `/lock`, `/unlock`, `/modlog` |

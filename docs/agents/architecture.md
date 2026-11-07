@@ -98,7 +98,8 @@ export const commands = [{ data, execute, deferEphemeral }, ...];
 - `UserError` → ephemeral error reply. Any other error → generic error reply and log.
 
 Component handler prefixes currently registered: `ticket`, `giveaway`, `music`, `flag`,
-`wordle`, `clone`. Add a new prefix in the `componentHandlers` object in `src/bot.js`.
+`wordle`, `mafia`, `fish`, `clone`. Add a new prefix in the `componentHandlers` object in
+`src/bot.js`. String select menus are routed the same way as buttons.
 
 ## Schedulers
 

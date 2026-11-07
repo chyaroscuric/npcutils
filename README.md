@@ -16,9 +16,10 @@ Custom Discord bot napravljen u [discord.js](https://discord.js.org) v14.
 | 😀 **Reaction roles** | Klikni emoji → dobiješ rolu, makni reakciju → izgubiš rolu |
 | 🎉 **Giveaway** | Giveaway s gumbom za prijavu, automatsko izvlačenje, reroll |
 | 🎵 **Glazba** | `/play` s YouTubea, SoundClouda, playliste ili pretrage; red, loop, shuffle, gumbi za kontrolu |
-| 🎮 **Igre** | Pogodi državu (zastave), Wordle, Kaladont, Toplo-hladno, Ship |
+| 🎮 **Igre** | Pogodi državu (zastave), Wordle, Kaladont, Toplo-hladno, Mafija, Pecanje, Ship |
 | 🔔 **Obavijesti s mreža** | Javi kad YouTube/TikTok objavi video ili Twitch/YouTube/TikTok počne stream |
 | 🖼️ **Welcome banner** | Automatski banner s pozadinom, avatarom i imenom novog člana |
+| 🚪 **Goodbye poruka** | Poruka kad član napusti server, s kanalom i tekstom po želji |
 | ✉️ **Poruke i embedi** | Pošalji običnu poruku ili embed kao bot, s dashboarda ili `/posalji` |
 | 🎂 **Rođendani** | Članovi postave datum, bot čestita i po želji dodijeli rolu na jedan dan |
 | 🔢 **Brojanje** | Članovi redom pišu 1, 2, 3…; pogrešan broj resetira niz i bot javi gdje je pukao |
@@ -180,6 +181,8 @@ Brzina: bot odmah dobije direktan link na zvuk, ne rekodira YouTubeov Opus i una
 - `/wordle` — pogodi riječ od 5 slova u 6 pokušaja (svatko igra svoju igru, klikom na **Pogodi**).
 - `/kaladont start` / `stop` — u tom kanalu svaka poruka od jedne riječi je potez: riječ mora počinjati sa zadnja dva slova prethodne, isti igrač ne smije dvaput zaredom, a tko napiše riječ na **-nt** pobjeđuje. Riječi se provjeravaju u hrvatskom i srpskom rječniku (preuzme se sam u `data/dict`).
 - `/toplohladno start` / `stop` — tajna riječ; svaki pokušaj dobije postotak blizine (0–100 %) i oznaku 🔥 vruće, 🌡️ toplo, 😊 mlako, ❄️ hladno ili 🧊 ledeno. Blizina se računa iz tematskih grupa riječi i udaljenosti slova, pa npr. **škola** i **učenik** budu blizu.
+- `/mafia start` / `stop` / `stats` — društvena igra za 4–15 igrača. Domaćin otvori okupljanje, igrači se pridruže gumbom, a bot tajno podijeli uloge: **Mafija**, **Detektiv**, **Doktor**, **Dama** i **Građani**. Noću posebne uloge izvršavaju akcije, danju se raspravlja i glasa. Mafija pobjeđuje kad izjednači broj živih, građani kad eliminaciju sve mafije.
+- `/fish` — baci mrežu i ulovi 1–3 ribe. Skupljaš XP, level i novčiće, a gumbima **Pecaj ponovno**, **Prodaj sve** i **Natrag** upravljaš ulovom. Rijetke ribe vrijede više.
 - `/ship korisnik1 [korisnik2]` — slika s avatarima i postotkom.
 
 ## 🔔 Obavijesti s mreža
@@ -201,6 +204,16 @@ Uz običnu welcome poruku bot može nacrtati banner: pozadinska slika, avatar no
 ```
 
 Ako se slika ne može preuzeti, bot pošalje običnu welcome poruku. Preporuka: široka slika barem 1024×512 px.
+
+## 🚪 Goodbye poruka
+
+Kad član napusti server, bot može poslati poruku odlaska u odabrani kanal. Podesi ju na dashboardu pod **Dobrodošlica i role → Odlazak** ili naredbom:
+
+```
+/goodbye set kanal:#odlasci poruka:👋 {username} je napustio/la {server}. Ostalo nas je {memberCount}.
+```
+
+Varijable: `{user}`, `{username}`, `{server}`, `{memberCount}`, `{inviter}`, `{invites}`, `{joined}`. `/goodbye test` pošalje testnu poruku, `/goodbye off` isključi.
 
 ## ✉️ Poruke i embedi
 

@@ -51,6 +51,7 @@ normalizer.
 | --- | --- | --- |
 | `config.welcome` | `features/members.js` | `{ channelId, message, imageUrl, banner }`; `banner` is normalized by `features/welcomeBanner.js`: `{ enabled, backgroundUrl, title, subtitle, accentColor, nameColor, overlay }` |
 | `config.boost` | `features/members.js` | `{ channelId, message, imageUrl }` |
+| `config.goodbye` | `features/members.js` | `{ channelId, message, imageUrl }`; sent when a member leaves |
 | `config.autoroles` | `features/members.js` | array of role IDs |
 | `config.stats` | `features/stats.js` | `{ categoryId, categoryName, channels: { members, bots, boosts, tiktok, youtube, twitch } }`; each channel `{ enabled, channelId, template, account }` |
 | `config.tickets` | `features/tickets.js` | `{ categoryId, supportRoleId, logChannelId }` |
@@ -64,6 +65,8 @@ normalizer.
 | `activity` | `features/activity.js` | last 30 `{ type, text, at }` |
 | `kaladont` | `features/games/kaladont.js` | channelId -> `{ lastWord, lastUserId, used, streak }` |
 | `toplo` | `features/games/toplo.js` | channelId -> `{ secret, startedAt, guesses: [{ word, percent, userId, at }], best }` |
+| `mafiaScores` | `features/games/mafia.js` | userId -> `{ points, wins, games }`; running games are in memory only |
+| `fishing` | `features/games/fishing.js` | `{ users: { userId: { xp, coins, inventory, casts, best, lastCastAt } } }` |
 | `config.birthdays` | `features/birthdays.js` | `{ enabled, channelId, roleId, hour, message, timezone }` |
 | `birthdays` | `features/birthdays.js` | userId -> `{ day, month, year, setAt, lastCelebrated }` |
 | `birthdayRoles` | `features/birthdays.js` | userId -> `{ year, roleId }` (active birthday role) |
