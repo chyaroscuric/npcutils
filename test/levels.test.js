@@ -58,6 +58,18 @@ test('voice time becomes XP and top lists sort', () => {
   assert.equal(top.text[0].userId, 'u1');
 });
 
+test('level announcements use the configured channel', async () => {
+  levels.saveConfig('g1', { enabled: true, announce: true, channelId: 'c2', xpPerMessage: 100, cooldownSec: 0 });
+  const sent = [];
+  const target = { send: async (p) => sent.push(p.content) };
+  const m = message('u3');
+  m.guild.channels = { cache: new Map([['c2', target]]) };
+  m.channel = { send: async () => { throw new Error('wrong channel'); } };
+  await levels.onMessage(m);
+  assert.equal(sent.length, 1);
+  assert.match(sent[0], /level 1/);
+});
+
 test('reset user and all', () => {
   assert.equal(levels.resetUser('g1', 'u1'), true);
   assert.equal(levels.statsFor('g1', 'u1').messages, 0);

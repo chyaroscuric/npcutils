@@ -495,7 +495,15 @@ export function startDashboard(client, port) {
     res.json(levelsPayload(req.guild));
   });
   api.put('/guilds/:gid/levels', (req, res) => {
-    ok(res, { config: levels.saveConfig(req.guild.id, req.body ?? {}) });
+    const body = req.body ?? {};
+    if ('channelId' in body) {
+      const channel = body.channelId ? req.guild.channels.cache.get(body.channelId) : null;
+      if (body.channelId && (!channel || ![ChannelType.GuildText, ChannelType.GuildAnnouncement].includes(channel.type))) {
+        throw new UserError('Odaberi tekstualni kanal za obavijesti o levelu.');
+      }
+      body.channelId = channel ? channel.id : null;
+    }
+    ok(res, { config: levels.saveConfig(req.guild.id, body) });
   });
   api.delete('/guilds/:gid/levels/:userId', (req, res) => {
     ok(res, { removed: levels.resetUser(req.guild.id, req.params.userId) });

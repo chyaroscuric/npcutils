@@ -1089,6 +1089,9 @@
       if (!row) return;
       const to = e.relatedTarget;
       if (to && to.closest && to.closest('.nav-row')) return;
+      // Moving over a group label inside the scrolling nav must not snap the
+      // pill back to the active row; it should keep following the list.
+      if (row.closest('.side-scroll') && to && to.closest && to.closest('.side-scroll')) return;
       resetNavPill(false);
     });
     sb.addEventListener('pointerleave', () => resetNavPill(false));
@@ -3730,7 +3733,7 @@
   function drawLevels() {
     const { g, ctx, levels } = state.page;
     const c = levels.config;
-    const id = { msg: uid('f'), voice: uid('f'), cd: uid('f') };
+    const id = { msg: uid('f'), voice: uid('f'), cd: uid('f'), channel: uid('f') };
     mount(ctx.el, html`${ctx.head}
       <div class="cols cols-form-right">
         <div class="stack">
@@ -3742,6 +3745,9 @@
               <div class="fields">
                 <label class="toggle"><input type="checkbox" role="switch" name="enabled" ${c.enabled ? raw('checked') : ''}><span class="track" aria-hidden="true"></span><span>Uključi levele</span></label>
                 <label class="toggle"><input type="checkbox" role="switch" name="announce" ${c.announce ? raw('checked') : ''}><span class="track" aria-hidden="true"></span><span>Objavi kad netko dosegne novi level</span></label>
+                ${field({ name: 'channelId', label: 'Kanal za obavijesti', id: id.channel,
+                  help: 'Level-up obavijesti idu u ovaj kanal. Bez odabira, bot objavljuje u kanalu u kojem je poruka poslana.',
+                  control: selectField({ id: id.channel, name: 'channelId', options: [{ value: '', label: 'Isti kanal kao poruka', group: '' }, ...textChannelOptions(g)], value: c.channelId || '', placeholder: 'Isti kanal kao poruka' }) })}
                 <div class="field-row">
                   ${field({ name: 'xpPerMessage', label: 'XP po poruci', id: id.msg, help: '1–100.',
                     control: html`<input class="input" id="${id.msg}" name="xpPerMessage" type="number" min="1" max="100" value="${c.xpPerMessage}" aria-describedby="${id.msg}-help">` })}
@@ -3769,6 +3775,7 @@
             <ul class="plain-list">
               <li>${icon('ti-message')}<span class="row-main">Svaka poruka broji se u TOP TEXT, a XP dobivaš uz cooldown.</span></li>
               <li>${icon('ti-microphone')}<span class="row-main">Vrijeme u voice kanalu pretvara se u XP po minuti.</span></li>
+              <li>${icon('ti-bell')}<span class="row-main">Level-up obavijest ide u odabrani kanal ili u kanal u kojem je poruka poslana.</span></li>
               <li>${icon('ti-trophy')}<span class="row-main">\`/rank\` prikazuje tvoj level i rang, a \`/top\` rang listu.</span></li>
             </ul>
           </section>
@@ -3780,6 +3787,7 @@
     const body = {
       enabled: f.elements.enabled.checked,
       announce: f.elements.announce.checked,
+      channelId: formValue(f, 'channelId') || null,
       xpPerMessage: Number(formValue(f, 'xpPerMessage')),
       xpPerMinuteVoice: Number(formValue(f, 'xpPerMinuteVoice')),
       cooldownSec: Number(formValue(f, 'cooldownSec')),

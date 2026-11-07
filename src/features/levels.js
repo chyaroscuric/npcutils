@@ -5,6 +5,7 @@ export function defaultConfig() {
   return {
     enabled: true,
     announce: true,
+    channelId: null,
     xpPerMessage: 15,
     xpPerMinuteVoice: 5,
     cooldownSec: 60,
@@ -18,6 +19,7 @@ export function getConfig(guildId) {
 export function saveConfig(guildId, input = {}) {
   const next = getConfig(guildId);
   for (const key of ['enabled', 'announce']) if (key in input) next[key] = Boolean(input[key]);
+  if ('channelId' in input) next.channelId = input.channelId ? String(input.channelId) : null;
   if ('xpPerMessage' in input) next.xpPerMessage = Math.min(100, Math.max(1, Math.round(Number(input.xpPerMessage)) || 15));
   if ('xpPerMinuteVoice' in input) next.xpPerMinuteVoice = Math.min(100, Math.max(0, Math.round(Number(input.xpPerMinuteVoice)) || 0));
   if ('cooldownSec' in input) next.cooldownSec = Math.min(3600, Math.max(0, Math.round(Number(input.cooldownSec)) || 0));
@@ -63,7 +65,8 @@ export async function onMessage(message) {
     const after = levelForXp(totalXp(user, cfg));
     db.save();
     if (after > before && cfg.announce) {
-      await message.channel
+      const target = (cfg.channelId && message.guild.channels?.cache?.get(cfg.channelId)) || message.channel;
+      await target
         .send({ content: `🎉 <@${message.author.id}> je dosegao/la **level ${after}**!`, allowedMentions: { users: [message.author.id] } })
         .catch(() => {});
     }
