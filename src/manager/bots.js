@@ -51,7 +51,7 @@ async function healthy(port) {
 async function waitReady(entry, timeoutMs = 25_000) {
   const until = Date.now() + timeoutMs;
   while (Date.now() < until) {
-    if (entry.child.exitCode !== null) return false;
+    if (!entry.child || entry.child.exitCode !== null) return false;
     if (await healthy(entry.port)) return true;
     await new Promise((r) => setTimeout(r, 800));
   }
