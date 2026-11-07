@@ -7,10 +7,12 @@ import * as members from './features/members.js';
 import * as music from './features/music.js';
 import * as antinuke from './features/antinuke.js';
 import * as antilink from './features/antilink.js';
+import * as birthdays from './features/birthdays.js';
 import * as botSettings from './features/botSettings.js';
 import * as counting from './features/counting.js';
 import * as levels from './features/levels.js';
 import * as games from './features/games/index.js';
+import * as socialAlerts from './features/socialAlerts.js';
 import { logActivity } from './features/activity.js';
 import { startDashboard } from './dashboard/server.js';
 import * as cloneCommand from './commands/clone.js';
@@ -89,6 +91,8 @@ client.once(Events.ClientReady, async () => {
   for (const guild of client.guilds.cache.values()) await prepareGuild(guild);
   giveaways.start(client);
   levels.start(client);
+  birthdays.start(client);
+  socialAlerts.start(client);
   music.checkSetup();
   games.startGames();
 
@@ -226,6 +230,8 @@ process.on('uncaughtException', (err) => {
 function shutdown(code = 0) {
   try {
     levels.stop();
+    birthdays.stop();
+    socialAlerts.stop();
     db.flush();
   } catch (err) {
     console.error('[db]', err);

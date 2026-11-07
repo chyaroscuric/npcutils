@@ -67,6 +67,9 @@ export async function startRound(channel, continent) {
   if (db.guild(channel.guild.id).kaladont?.[channel.id]) {
     throw new UserError('U ovom kanalu traje kaladont. Igraj zastave u drugom kanalu ili zaustavi kaladont s `/kaladont stop`.');
   }
+  if (db.guild(channel.guild.id).toplo?.[channel.id]) {
+    throw new UserError('U ovom kanalu traje toplo-hladno. Igraj zastave u drugom kanalu ili zaustavi igru s `/toplohladno stop`.');
+  }
   const round = { country: pickCountry(channel.id, continent), continent, startedAt: Date.now(), hint: false };
   rounds.set(channel.id, round);
   lastCountry.set(channel.id, round.country.iso2);

@@ -1,8 +1,9 @@
 // Member join (autorole + welcome message) and boost messages.
-import { EmbedBuilder } from 'discord.js';
+import { AttachmentBuilder, EmbedBuilder } from 'discord.js';
 import * as db from '../db.js';
 import { COLOR, COLOR_BOOST, fillTemplate, roleProblem } from '../utils/helpers.js';
 import * as invites from './invites.js';
+import { normalizeBanner, renderWelcomeBanner } from './welcomeBanner.js';
 
 export const DEFAULT_WELCOME =
   'Dobrodošao/la {user} na **{server}**! 🎉\nTi si naš **{memberCount}.** član.\nPozvao/la te: {inviter}';
@@ -16,7 +17,7 @@ export async function giveAutoroles(member) {
   if (roles.length) await member.roles.add(roles, `${member.guild.client.user.username}: autorole`);
 }
 
-export function welcomePayload(member, inviterId) {
+export function welcomePayload(member, inviterId, { banner = null } = {}) {
   const g = db.guild(member.guild.id);
   const cfg = g.config.welcome;
   const inviterStats = inviterId ? invites.stats(g, inviterId) : null;
@@ -36,14 +37,45 @@ export function welcomePayload(member, inviterId) {
     .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
     .setTimestamp();
   if (cfg?.imageUrl) embed.setImage(cfg.imageUrl);
-  return { content: `${member}`, embeds: [embed], allowedMentions: { users: [member.id] } };
+  const payload = { content: `${member}`, embeds: [embed], allowedMentions: { users: [member.id] } };
+  if (banner) {
+    embed.setImage('attachment://welcome.png');
+    payload.files = [new AttachmentBuilder(banner, { name: 'welcome.png' })];
+  }
+  return payload;
+}
+
+// Adds the generated banner when the server enabled one; falls back to the
+// normal embed if the background or avatar cannot be downloaded.
+export async function buildWelcomePayload(member, inviterId) {
+  const cfg = db.guild(member.guild.id).config.welcome;
+  const bannerCfg = normalizeBanner(cfg?.banner);
+  if (!bannerCfg.enabled || !bannerCfg.backgroundUrl) return welcomePayload(member, inviterId);
+  try {
+    const banner = await renderWelcomeBanner({
+      backgroundUrl: bannerCfg.backgroundUrl,
+      avatarUrl: member.user.displayAvatarURL({ extension: 'png', size: 512 }),
+      name: member.displayName ?? member.user.username,
+      serverName: member.guild.name,
+      title: bannerCfg.title,
+      subtitle: bannerCfg.subtitle,
+      accentColor: bannerCfg.accentColor,
+      nameColor: bannerCfg.nameColor,
+      overlay: bannerCfg.overlay,
+      memberCount: member.guild.memberCount,
+    });
+    return welcomePayload(member, inviterId, { banner });
+  } catch (err) {
+    console.warn('[welcome] banner:', err.message);
+    return welcomePayload(member, inviterId);
+  }
 }
 
 export async function sendWelcome(member, inviterId) {
   const cfg = db.guild(member.guild.id).config.welcome;
   const channel = cfg?.channelId && member.guild.channels.cache.get(cfg.channelId);
   if (!channel) return;
-  await channel.send(welcomePayload(member, inviterId));
+  await channel.send(await buildWelcomePayload(member, inviterId));
 }
 
 export function boostPayload(member) {

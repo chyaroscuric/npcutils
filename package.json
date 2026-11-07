@@ -1,7 +1,7 @@
 {
   "name": "npcutils",
   "version": "1.0.0",
-  "description": "Discord bot (stats kanali, tiketi, invite counter, autorole, welcome/boost poruke, reaction roles, giveaway, glazba, web dashboard)",
+  "description": "Discord bot (stats kanali, tiketi, invite counter, autorole, welcome banner, obavijesti s mreza, rodendani, poruke/embedi, giveaway, glazba, igre, web dashboard)",
   "type": "module",
   "main": "src/index.js",
   "scripts": {

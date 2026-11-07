@@ -9,17 +9,22 @@ import * as db from '../db.js';
 import { recentActivity } from '../features/activity.js';
 import * as giveaways from '../features/giveaways.js';
 import * as invites from '../features/invites.js';
-import { DEFAULT_BOOST, DEFAULT_WELCOME, boostPayload, welcomePayload } from '../features/members.js';
+import { DEFAULT_BOOST, DEFAULT_WELCOME, boostPayload, buildWelcomePayload } from '../features/members.js';
+import { normalizeBanner } from '../features/welcomeBanner.js';
 import * as music from '../features/music.js';
 import * as antinuke from '../features/antinuke.js';
 import * as antilink from '../features/antilink.js';
+import * as birthdays from '../features/birthdays.js';
 import * as botSettings from '../features/botSettings.js';
 import * as counting from '../features/counting.js';
 import * as levels from '../features/levels.js';
 import * as kaladont from '../features/games/kaladont.js';
+import * as toplo from '../features/games/toplo.js';
+import { sendMessage } from '../features/messages.js';
 import { clearWarns } from '../features/moderation.js';
 import * as reactionRoles from '../features/reactionRoles.js';
 import { STATS, STATS_DEFINITIONS, getStatsConfig, getStatsSnapshot, removeStats, setupStats, updateStats } from '../features/stats.js';
+import * as socialAlerts from '../features/socialAlerts.js';
 import { closeTicketChannel, panelPayload } from '../features/tickets.js';
 import { parseDuration } from '../utils/duration.js';
 import { UserError, roleProblem } from '../utils/helpers.js';
@@ -309,6 +314,7 @@ export function startDashboard(client, port) {
           channelId: g.config.welcome?.channelId ?? null,
           message: g.config.welcome?.message ?? '',
           imageUrl: g.config.welcome?.imageUrl ?? null,
+          banner: normalizeBanner(g.config.welcome?.banner),
           defaultMessage: DEFAULT_WELCOME,
         },
         boost: {
@@ -346,11 +352,14 @@ export function startDashboard(client, port) {
         antilink: { enabled: antilink.getConfig(guild.id).enabled },
         modLogChannelId: g.config.modLogChannelId ?? null,
         kaladontCount: kaladont.activeGames(guild.id).length,
+        toploCount: toplo.activeGames(guild.id).length,
         counting: (() => {
           const c = counting.getConfig(guild.id);
           return c ? { enabled: true, channelId: c.channelId, current: c.current ?? 0, best: c.best ?? 0 } : { enabled: false };
         })(),
         levels: { enabled: levels.getConfig(guild.id).enabled },
+        social: { enabled: socialAlerts.getConfig(guild.id).enabled, accountCount: socialAlerts.getConfig(guild.id).accounts.length },
+        birthdays: { enabled: birthdays.getConfig(guild.id).enabled, count: Object.keys(g.birthdays ?? {}).length },
       },
       activity: recentActivity(guild.id),
     });
@@ -385,13 +394,14 @@ export function startDashboard(client, port) {
   // ---------- welcome / boost / autoroles ----------
   for (const kind of ['welcome', 'boost']) {
     api.put(`/guilds/:gid/${kind}`, (req, res) => {
-      const { enabled, channelId, message, imageUrl } = req.body ?? {};
+      const { enabled, channelId, message, imageUrl, banner } = req.body ?? {};
       if (!enabled) delete req.g.config[kind];
       else {
         const channel = textChannel(req.guild, channelId);
         const text = String(message ?? '').trim();
         if (text.length > 2000) throw new UserError('Poruka može imati najviše 2000 znakova.');
         req.g.config[kind] = { channelId: channel.id, message: text || null, imageUrl: imageUrlOf(imageUrl) };
+        if (kind === 'welcome') req.g.config[kind].banner = normalizeBanner(banner);
       }
       db.save();
       ok(res);
@@ -400,7 +410,9 @@ export function startDashboard(client, port) {
       const cfg = req.g.config[kind];
       const channel = cfg && req.guild.channels.cache.get(cfg.channelId);
       if (!channel) throw new UserError('Prvo uključi i spremi poruku.');
-      const payload = kind === 'welcome' ? welcomePayload(req.member, req.g.joins[req.userId]?.inviterId ?? null) : boostPayload(req.member);
+      const payload = kind === 'welcome'
+        ? await buildWelcomePayload(req.member, req.g.joins[req.userId]?.inviterId ?? null)
+        : boostPayload(req.member);
       await channel.send(payload).catch(() => {
         throw new UserError(`Ne mogu slati poruke u #${channel.name}.`);
       });
@@ -783,6 +795,10 @@ export function startDashboard(client, port) {
         channelName: req.guild.channels.cache.get(k.channelId)?.name ?? 'obrisan-kanal',
         lastUser: k.lastUserId ? userInfo(req.guild, k.lastUserId) : null,
       })),
+      toplo: toplo.activeGames(req.guild.id).map((k) => ({
+        ...k,
+        channelName: req.guild.channels.cache.get(k.channelId)?.name ?? 'obrisan-kanal',
+      })),
     });
   });
   api.post('/guilds/:gid/games/kaladont', async (req, res) => {
@@ -793,6 +809,155 @@ export function startDashboard(client, port) {
     // works for deleted channels too
     kaladont.stop({ id: req.params.channelId, guild: req.guild });
     ok(res);
+  });
+  api.post('/guilds/:gid/games/toplo', async (req, res) => {
+    await toplo.start(textChannel(req.guild, req.body?.channelId));
+    ok(res);
+  });
+  api.delete('/guilds/:gid/games/toplo/:channelId', (req, res) => {
+    toplo.stop({ id: req.params.channelId, guild: req.guild });
+    ok(res);
+  });
+
+  // ---------- social notifications ----------
+  const socialPayload = (guild) => {
+    const cfg = socialAlerts.getConfig(guild.id);
+    const channel = cfg.channelId && guild.channels.cache.get(cfg.channelId);
+    const role = cfg.roleId && guild.roles.cache.get(cfg.roleId);
+    return {
+      config: cfg,
+      channel: channel ? { id: channel.id, name: channel.name } : null,
+      role: role ? { id: role.id, name: role.name } : null,
+      accounts: cfg.accounts.map((a) => socialAlerts.accountSummary(a)),
+      platforms: Object.entries(socialAlerts.PLATFORMS).map(([key, def]) => ({ key, label: def.label, events: def.events })),
+      defaultMessage: socialAlerts.DEFAULT_MESSAGE,
+      pollMinutes: socialAlerts.pollMinutes,
+    };
+  };
+  api.get('/guilds/:gid/social', (req, res) => res.json(socialPayload(req.guild)));
+  api.put('/guilds/:gid/social', (req, res) => {
+    const body = req.body ?? {};
+    const enabled = Boolean(body.enabled);
+    let channelId = null;
+    if (body.channelId) channelId = textChannel(req.guild, body.channelId).id;
+    if (enabled && !channelId) throw new UserError('Odaberi kanal za obavijesti.');
+    let roleId = null;
+    if (body.roleId) {
+      const role = req.guild.roles.cache.get(String(body.roleId));
+      if (!role) throw new UserError('Odabrana rola više ne postoji.');
+      roleId = role.id;
+    }
+    socialAlerts.saveConfig(req.guild.id, {
+      enabled,
+      channelId,
+      roleId,
+      message: String(body.message ?? '').slice(0, 2000),
+    });
+    ok(res, socialPayload(req.guild));
+  });
+  api.post('/guilds/:gid/social/accounts', (req, res) => {
+    const body = req.body ?? {};
+    if (!socialAlerts.PLATFORMS[body.platform]) throw new UserError('Odaberi platformu.');
+    try {
+      const account = socialAlerts.addAccount(req.guild.id, body);
+      ok(res, { account: socialAlerts.accountSummary(account), ...socialPayload(req.guild) });
+    } catch (err) {
+      throw err instanceof UserError ? err : new UserError(err.message);
+    }
+  });
+  api.put('/guilds/:gid/social/accounts/:id', (req, res) => {
+    try {
+      const account = socialAlerts.updateAccount(req.guild.id, req.params.id, req.body ?? {});
+      ok(res, { account: socialAlerts.accountSummary(account), ...socialPayload(req.guild) });
+    } catch (err) {
+      throw err instanceof UserError ? err : new UserError(err.message);
+    }
+  });
+  api.delete('/guilds/:gid/social/accounts/:id', (req, res) => {
+    socialAlerts.removeAccount(req.guild.id, req.params.id);
+    ok(res, socialPayload(req.guild));
+  });
+  api.post('/guilds/:gid/social/check', async (req, res) => {
+    const result = await socialAlerts.checkGuild(req.guild, { notify: Boolean(req.body?.notify) });
+    ok(res, { ...result, ...socialPayload(req.guild) });
+  });
+  api.post('/guilds/:gid/social/test', async (req, res) => {
+    try {
+      await socialAlerts.testNotification(req.guild, req.body?.accountId);
+      ok(res);
+    } catch (err) {
+      throw err instanceof UserError ? err : new UserError(err.message);
+    }
+  });
+
+  // ---------- birthdays ----------
+  const birthdayPayload = (guild) => {
+    const cfg = birthdays.getConfig(guild.id);
+    const channel = cfg.channelId && guild.channels.cache.get(cfg.channelId);
+    const role = cfg.roleId && guild.roles.cache.get(cfg.roleId);
+    const today = birthdays.localParts(new Date(), cfg.timezone);
+    return {
+      config: cfg,
+      channel: channel ? { id: channel.id, name: channel.name } : null,
+      role: role ? { id: role.id, name: role.name } : null,
+      today,
+      defaultMessage: birthdays.DEFAULT_MESSAGE,
+      birthdays: birthdays.listBirthdays(guild.id, { timeZone: cfg.timezone }).map((entry) => ({
+        ...entry,
+        user: userInfo(guild, entry.userId),
+        next: entry.next
+          ? { ...entry.next, date: entry.next.date.toISOString(), age: birthdays.ageOn(entry, entry.next.year) }
+          : null,
+      })),
+    };
+  };
+  api.get('/guilds/:gid/birthdays', (req, res) => res.json(birthdayPayload(req.guild)));
+  api.put('/guilds/:gid/birthdays', (req, res) => {
+    const body = req.body ?? {};
+    const current = birthdays.getConfig(req.guild.id);
+    const input = {};
+    if ('enabled' in body) input.enabled = Boolean(body.enabled);
+    if ('channelId' in body) {
+      input.channelId = body.channelId ? textChannel(req.guild, body.channelId).id : null;
+    }
+    const nextEnabled = 'enabled' in body ? Boolean(body.enabled) : current.enabled;
+    const nextChannel = 'channelId' in input ? input.channelId : current.channelId;
+    if (nextEnabled && !nextChannel) throw new UserError('Odaberi kanal za rođendanske čestitke.');
+    if ('roleId' in body) {
+      if (body.roleId) {
+        const role = req.guild.roles.cache.get(String(body.roleId));
+        if (!role) throw new UserError('Odabrana rola više ne postoji.');
+        const problem = roleProblem(req.guild, role);
+        if (problem) throw new UserError(problem.replace(/\*\*/g, '').replace(/<@&\d+>/g, role.name));
+        input.roleId = role.id;
+      } else input.roleId = null;
+    }
+    if ('hour' in body) input.hour = Number(body.hour);
+    if ('message' in body) input.message = String(body.message ?? '').slice(0, 2000);
+    birthdays.saveConfig(req.guild.id, input);
+    ok(res, birthdayPayload(req.guild));
+  });
+  api.delete('/guilds/:gid/birthdays/:userId', (req, res) => {
+    ok(res, { removed: birthdays.removeBirthday(req.guild.id, req.params.userId), ...birthdayPayload(req.guild) });
+  });
+  api.post('/guilds/:gid/birthdays/test', async (req, res) => {
+    try {
+      await birthdays.sendTest(req.guild, req.member);
+      ok(res);
+    } catch (err) {
+      throw err instanceof UserError ? err : new UserError(err.message);
+    }
+  });
+
+  // ---------- send message / embed ----------
+  api.post('/guilds/:gid/messages/send', async (req, res) => {
+    const channel = textChannel(req.guild, req.body?.channelId);
+    try {
+      const message = await sendMessage(channel, req.body ?? {});
+      ok(res, { url: message.url, messageId: message.id, channelId: channel.id });
+    } catch (err) {
+      throw err instanceof UserError ? err : new UserError(err.message || `Ne mogu slati poruke u #${channel.name}.`);
+    }
   });
 
   // ---------- music ----------

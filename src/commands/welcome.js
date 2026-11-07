@@ -1,6 +1,7 @@
 import { ChannelType, InteractionContextType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import * as db from '../db.js';
-import { DEFAULT_WELCOME, welcomePayload } from '../features/members.js';
+import { DEFAULT_WELCOME, buildWelcomePayload } from '../features/members.js';
+import { normalizeBanner } from '../features/welcomeBanner.js';
 import { fail, reply } from '../utils/helpers.js';
 
 // Acknowledged right away (ephemeral) because these commands talk to Discord and can take >3 s.
@@ -23,6 +24,18 @@ export const data = new SlashCommandBuilder()
           .setName('poruka')
           .setDescription('{user} {username} {server} {memberCount} {inviter} {invites}, \\n = novi red')
           .setMaxLength(2000),
+      )
+      .addStringOption((o) =>
+        o
+          .setName('banner')
+          .setDescription('URL pozadinske slike za automatski banner (avatar i ime se dodaju sami)')
+          .setMaxLength(2048),
+      )
+      .addStringOption((o) =>
+        o
+          .setName('banner_tekst')
+          .setDescription('Tekst na banneru, npr. "Dobrodošao/la kod {server}"')
+          .setMaxLength(160),
       ),
   )
   .addSubcommand((s) => s.setName('test').setDescription('Pošalji testnu welcome poruku (za tebe)'))
@@ -35,9 +48,22 @@ export async function execute(interaction) {
   if (sub === 'set') {
     const channel = interaction.options.getChannel('kanal', true);
     const message = interaction.options.getString('poruka');
-    g.config.welcome = { channelId: channel.id, message: message ?? null };
+    const bannerUrl = interaction.options.getString('banner');
+    const bannerTitle = interaction.options.getString('banner_tekst');
+    const previousBanner = normalizeBanner(g.config.welcome?.banner);
+    const banner = {
+      ...previousBanner,
+      enabled: bannerUrl ? true : previousBanner.enabled,
+      backgroundUrl: bannerUrl ?? previousBanner.backgroundUrl,
+    };
+    if (bannerTitle) banner.title = bannerTitle;
+    g.config.welcome = { channelId: channel.id, message: message ?? null, banner };
     db.save();
-    return reply(interaction, `✅ Welcome poruke idu u ${channel}.\n**Poruka:**\n${message ?? DEFAULT_WELCOME}`);
+    return reply(
+      interaction,
+      `✅ Welcome poruke idu u ${channel}.\n**Poruka:**\n${message ?? DEFAULT_WELCOME}` +
+        (banner.enabled && banner.backgroundUrl ? '\n\n🖼️ Automatski banner je uključen.' : ''),
+    );
   }
   if (sub === 'off') {
     delete g.config.welcome;
@@ -47,7 +73,7 @@ export async function execute(interaction) {
   if (sub === 'test') {
     const channel = g.config.welcome && interaction.guild.channels.cache.get(g.config.welcome.channelId);
     if (!channel) return fail(interaction, 'Welcome nije podešen. Koristi `/welcome set`.');
-    await channel.send(welcomePayload(interaction.member, g.joins[interaction.user.id]?.inviterId ?? null));
+    await channel.send(await buildWelcomePayload(interaction.member, g.joins[interaction.user.id]?.inviterId ?? null));
     return reply(interaction, `✅ Testna poruka poslana u ${channel}.`);
   }
 }

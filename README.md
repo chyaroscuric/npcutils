@@ -2,6 +2,8 @@
 
 Custom Discord bot napravljen u [discord.js](https://discord.js.org) v14.
 
+> Razvijaš ili mijenjaš bota? Pročitaj [AGENTS.md](AGENTS.md) i [docs/agents/](docs/agents/README.md).
+
 | Feature | Što radi |
 | --- | --- |
 | 🟢 **Uvijek aktivan** | Status se postavlja na dashboardu, auto-reconnect, ne pada na greškama, Docker / pm2 restart, keep-alive HTTP endpoint |
@@ -14,7 +16,11 @@ Custom Discord bot napravljen u [discord.js](https://discord.js.org) v14.
 | 😀 **Reaction roles** | Klikni emoji → dobiješ rolu, makni reakciju → izgubiš rolu |
 | 🎉 **Giveaway** | Giveaway s gumbom za prijavu, automatsko izvlačenje, reroll |
 | 🎵 **Glazba** | `/play` s YouTubea, SoundClouda, playliste ili pretrage; red, loop, shuffle, gumbi za kontrolu |
-| 🎮 **Igre** | Pogodi državu (zastave), Wordle, Kaladont, Ship |
+| 🎮 **Igre** | Pogodi državu (zastave), Wordle, Kaladont, Toplo-hladno, Ship |
+| 🔔 **Obavijesti s mreža** | Javi kad YouTube/TikTok objavi video ili Twitch/YouTube/TikTok počne stream |
+| 🖼️ **Welcome banner** | Automatski banner s pozadinom, avatarom i imenom novog člana |
+| ✉️ **Poruke i embedi** | Pošalji običnu poruku ili embed kao bot, s dashboarda ili `/posalji` |
+| 🎂 **Rođendani** | Članovi postave datum, bot čestita i po želji dodijeli rolu na jedan dan |
 | 🔢 **Brojanje** | Članovi redom pišu 1, 2, 3…; pogrešan broj resetira niz i bot javi gdje je pukao |
 | 📈 **Leveli** | XP iz poruka i vremena u voice kanalu, `/rank` i `/top` rang liste |
 | 🔨 **Moderacija** | `/purge`, `/ban`, `/kick`, `/timeout`, `/warn`, `/lock`, `/slowmode`… s logom moderacije |
@@ -113,7 +119,7 @@ pm2 start ecosystem.config.cjs && pm2 save && pm2 startup
 
 ## 🌐 Dashboard
 
-Dashboard je web stranica na kojoj se prijaviš Discordom i podesiš sve bez komandi: welcome i boost poruke, autorole, stats kanale, tikete (i zatvaranje otvorenih), invite-ove (bonus, reset), reaction role, giveawaye i glazbu (dodavanje pjesama, pauza, skip, red).
+Dashboard je web stranica na kojoj se prijaviš Discordom i podesiš sve bez komandi: welcome i boost poruke (s automatskim bannerom), autorole, stats kanale, tikete (i zatvaranje otvorenih), invite-ove (bonus, reset), reaction role, giveawaye, glazbu (dodavanje pjesama, pauza, skip, red), rođendane, obavijesti s mreža i poruke/embede.
 
 1. U `.env` postavi `PORT` (npr. `3000`), `CLIENT_SECRET` (Developer Portal → OAuth2) i `DASHBOARD_URL` (adresa na kojoj se otvara, npr. `http://localhost:3000`).
 2. U Developer Portalu → OAuth2 → Redirects dodaj `DASHBOARD_URL` + `/callback`.
@@ -173,7 +179,41 @@ Brzina: bot odmah dobije direktan link na zvuk, ne rekodira YouTubeov Opus i una
 - `/zastava [kontinent]` — bot pokaže zastavu, prvi tko u chat upiše državu (hrvatski ili engleski naziv) pobjeđuje. Gumbi **Preskoči**, **Pomoć** i **Igraj ponovno**.
 - `/wordle` — pogodi riječ od 5 slova u 6 pokušaja (svatko igra svoju igru, klikom na **Pogodi**).
 - `/kaladont start` / `stop` — u tom kanalu svaka poruka od jedne riječi je potez: riječ mora počinjati sa zadnja dva slova prethodne, isti igrač ne smije dvaput zaredom, a tko napiše riječ na **-nt** pobjeđuje. Riječi se provjeravaju u hrvatskom i srpskom rječniku (preuzme se sam u `data/dict`).
+- `/toplohladno start` / `stop` — tajna riječ; svaki pokušaj dobije postotak blizine (0–100 %) i oznaku 🔥 vruće, 🌡️ toplo, 😊 mlako, ❄️ hladno ili 🧊 ledeno. Blizina se računa iz tematskih grupa riječi i udaljenosti slova, pa npr. **škola** i **učenik** budu blizu.
 - `/ship korisnik1 [korisnik2]` — slika s avatarima i postotkom.
+
+## 🔔 Obavijesti s mreža
+
+Dashboard → **Obavijesti** prati javne YouTube, Twitch i TikTok račune i šalje embed kad:
+
+- YouTube objavi novi video (RSS) ili počne live stream,
+- Twitch počne stream (uključivo naslov i igru),
+- TikTok objavi novi video (broj videa) ili počne live.
+
+Prva provjera samo zapamti stanje, a svaka sljedeća promjena šalje obavijest. Možeš odabrati kanal, rolu koja se spominje, tekst poruke i pojedinačno uključiti **Video** i **Uživo** za svaki račun. Provjera ide svakih 5 minuta (`SOCIAL_POLL_MINUTES`). TikTok i YouTube link ponekad vode na profil jer javna stranica ne daje direktan link na video bez API-ja.
+
+## 🖼️ Welcome banner
+
+Uz običnu welcome poruku bot može nacrtati banner: pozadinska slika, avatar novog člana u krugu i njegovo ime u traci. Postavi ga na dashboardu pod **Dobrodošlica i role** (URL pozadine, tekst, boje) ili naredbom:
+
+```
+/welcome set kanal:#dobrodošli banner:https://example.com/pozadina.png banner_tekst:Dobrodošao/la kod {server}
+```
+
+Ako se slika ne može preuzeti, bot pošalje običnu welcome poruku. Preporuka: široka slika barem 1024×512 px.
+
+## ✉️ Poruke i embedi
+
+Dashboard → **Poruke** ima builder za običnu poruku i embed (naslov, opis, boja, autor, podnožje, slika, miniatura, poveznica, do 25 polja i pregled). Isto možeš poslati naredbom `/posalji` s kanalom, tekstom, naslovom, opisom, bojom, slikom, autorom i podnožjem.
+
+## 🎂 Rođendani
+
+- `/birthday postavi dan:14 mjesec:2 [godina:2001]` — spremi svoj datum.
+- `/birthday ukloni`, `/birthday sljedeci [korisnik]`.
+- `/birthday postavke kanal:#rođendani [rola] [sat] [poruka]` — uključi čestitke.
+- `/birthday test`, `/birthday iskljuci`.
+
+Bot čestita jednom godišnje u odabranom kanalu, može spomenuti člana i dodijeliti rolu na jedan dan. 29. veljače u neprestupnim godinama slavi se 28. veljače. Vremenska zona je `Europe/Zagreb` (`BOT_TIMEZONE`).
 
 ## 🔨 Moderacija
 
@@ -185,7 +225,7 @@ Brzina: bot odmah dobije direktan link na zvuk, ne rekodira YouTubeov Opus i una
 2. Na serveru u koji kopiraš (samo **vlasnik**): `/klon cilj`
 3. Na bilo kojem od njih: `/klon pokreni [profil] [emojiji] [postavke_bota]` → bot napiše što će obrisati i napraviti, a klikom na **Obriši i kopiraj** kreće.
 
-Na ciljnom serveru se brišu svi kanali i role, pa se kopiraju role (s redoslijedom i bojama), kategorije i kanali s dozvolama (rola i članova koji su i na cilju), pravila / system kanal, po želji ime i ikona servera, emojiji i postavke ovog bota (welcome, boost, autorole, tiketi, stats, log moderacije, anti-nuke) prebačene na nove kanale i role. Poruke i članovi se ne kopiraju. Bot treba Administrator i rolu na vrhu na oba servera. Ako je komanda pokrenuta u kanalu ciljnog servera, taj se kanal na kraju obriše, a izvještaj stiže u DM.
+Na ciljnom serveru se brišu svi kanali i role, pa se kopiraju role (s redoslijedom i bojama), kategorije i kanali s dozvolama (rola i članova koji su i na cilju), pravila / system kanal, po želji ime i ikona servera, emojiji i postavke ovog bota (welcome s bannerom, boost, autorole, tiketi, stats, log moderacije, anti-nuke, rođendani, obavijesti s mreža) prebačene na nove kanale i role. Poruke i članovi se ne kopiraju. Bot treba Administrator i rolu na vrhu na oba servera. Ako je komanda pokrenuta u kanalu ciljnog servera, taj se kanal na kraju obriše, a izvještaj stiže u DM.
 
 ## 🛡️ Anti-nuke
 
@@ -267,7 +307,11 @@ src/
   index.js            # pokretanje, eventi, registracija komandi
   db.js               # JSON baza (data/db.json)
   commands/           # slash komande
-  features/           # logika: stats, tickets, invites, members (welcome/autorole/boost), reactionRoles, giveaways, music
+  features/           # logika: stats, tickets, invites, members, reactionRoles, giveaways, music, socialAlerts, birthdays, games
   dashboard/          # server.js (Express API + Discord login) i public/ (sučelje)
+  data/               # države, riječi, semantičke grupe
+  manager/            # BYOT panel i procesi botova
 test/                 # npm test, npm run check
+docs/agents/          # detaljna dokumentacija za agente
+AGENTS.md             # ulazna točka za agente i developere
 ```

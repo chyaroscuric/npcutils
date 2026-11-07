@@ -2,6 +2,7 @@
 import { ready } from './dictionary.js';
 import * as flags from './flags.js';
 import * as kaladont from './kaladont.js';
+import * as toplo from './toplo.js';
 import * as wordle from './wordle.js';
 
 export const componentHandlers = {
@@ -11,8 +12,9 @@ export const componentHandlers = {
 
 // Called for every guild message; cheap when no game runs in that channel.
 export async function onMessage(message) {
-  if (await flags.onMessage(message)) return;
-  await kaladont.onMessage(message);
+  if (await flags.onMessage(message)) return true;
+  if (await kaladont.onMessage(message)) return true;
+  return toplo.onMessage(message);
 }
 
 // Loads (and on first start downloads) the dictionary in the background.

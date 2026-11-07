@@ -6,11 +6,11 @@ const cache = new Map(); // `${platform}:${account}` -> { at, data }
 const numberFmt = new Intl.NumberFormat('hr-HR');
 export const formatCount = (n) => numberFmt.format(Number(n) || 0);
 
-function cleanAccount(value) {
+export function cleanAccount(value) {
   return String(value ?? '')
     .trim()
-    .replace(/^@/, '')
     .replace(/^https?:\/\/(?:www\.)?(?:tiktok\.com|youtube\.com|twitch\.tv)\//i, '')
+    .replace(/^@/, '')
     .split(/[/?#]/)[0]
     .trim();
 }

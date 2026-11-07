@@ -2,6 +2,7 @@ import { AttachmentBuilder, EmbedBuilder, InteractionContextType, PermissionFlag
 import { CONTINENTS } from '../data/countries.js';
 import { startRound } from '../features/games/flags.js';
 import * as kaladont from '../features/games/kaladont.js';
+import * as toplo from '../features/games/toplo.js';
 import { comment, renderShip, shipName, shipPercent } from '../features/games/ship.js';
 import { startGame } from '../features/games/wordle.js';
 import { UserError, reply } from '../utils/helpers.js';
@@ -61,6 +62,33 @@ const kaladontCommand = {
   },
 };
 
+const toploCommand = {
+  deferEphemeral: true,
+  data: new SlashCommandBuilder()
+    .setName('toplohladno')
+    .setDescription('Igra toplo-hladno: pogađaj riječ, bot kaže koliko je blizu')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+    .setContexts(InteractionContextType.Guild)
+    .addSubcommand((s) => s.setName('start').setDescription('Pokreni igru u ovom kanalu'))
+    .addSubcommand((s) => s.setName('stop').setDescription('Zaustavi igru u ovom kanalu')),
+  async execute(interaction) {
+    if (interaction.options.getSubcommand() === 'start') {
+      await toplo.start(interaction.channel);
+      return reply(interaction, '✅ Toplo-hladno je pokrenuto u ovom kanalu.');
+    }
+    const game = toplo.stop(interaction.channel);
+    await interaction.channel.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0x4f545c)
+          .setTitle('🛑 Toplo-hladno je zaustavljeno')
+          .setDescription(`Tajna riječ je bila **${game.secret}** · ${game.guesses.length} pokušaja`),
+      ],
+    });
+    return reply(interaction, '✅ Zaustavljeno.');
+  },
+};
+
 const ship = {
   data: new SlashCommandBuilder()
     .setName('ship')
@@ -86,4 +114,4 @@ const ship = {
   },
 };
 
-export const commands = [zastava, wordle, kaladontCommand, ship];
+export const commands = [zastava, wordle, kaladontCommand, toploCommand, ship];

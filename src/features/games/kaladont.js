@@ -68,6 +68,9 @@ export async function start(channel) {
   const all = games(channel.guild.id);
   if (all[channel.id]) throw new UserError('Kaladont već traje u ovom kanalu. Zaustavi ga s `/kaladont stop`.');
   if (hasRound(channel.id)) throw new UserError('U ovom kanalu traje pogađanje zastava. Pokreni kaladont u drugom kanalu.');
+  if (db.guild(channel.guild.id).toplo?.[channel.id]) {
+    throw new UserError('U ovom kanalu traje toplo-hladno. Pokreni kaladont u drugom kanalu ili zaustavi igru s `/toplohladno stop`.');
+  }
   const game = newGame();
   all[channel.id] = game;
   db.save();
@@ -138,5 +141,5 @@ export function onMessage(message) {
     .then(() => handleMove(message))
     .catch((err) => console.error('[kaladont]', err));
   queues.set(message.channelId, queue);
-  return queue;
+  return true;
 }

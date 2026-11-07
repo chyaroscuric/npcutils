@@ -117,6 +117,17 @@ export function copyBotSettings(sourceId, targetId, roleMap, channelMap) {
   if (c.antinuke) {
     config.antinuke = { ...c.antinuke, logChannelId: ch(c.antinuke.logChannelId), whitelistRoles: (c.antinuke.whitelistRoles ?? []).map(role).filter(Boolean) };
   }
+  if (c.birthdays && ch(c.birthdays.channelId)) {
+    config.birthdays = { ...c.birthdays, channelId: ch(c.birthdays.channelId), roleId: role(c.birthdays.roleId) };
+  }
+  if (c.socialAlerts && ch(c.socialAlerts.channelId)) {
+    config.socialAlerts = {
+      ...c.socialAlerts,
+      channelId: ch(c.socialAlerts.channelId),
+      roleId: role(c.socialAlerts.roleId),
+      accounts: (c.socialAlerts.accounts ?? []).map((account) => ({ ...account, state: {} })),
+    };
+  }
   dst.config = config;
 }
 
@@ -132,6 +143,9 @@ function resetTargetData(targetId, { configCopied }) {
   g.giveaways = {};
   g.tickets = { counter: 0, open: {} };
   g.kaladont = {};
+  g.toplo = {};
+  g.birthdays = {};
+  g.birthdayRoles = {};
 }
 
 export async function cloneServer({ source, target, keepChannelId, options, progress }) {
