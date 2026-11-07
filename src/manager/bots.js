@@ -70,6 +70,7 @@ function envFor(bot, token, port) {
     CLIENT_SECRET: '',
     GUILD_ID: '',
     BOT_OWNER_ID: bot.ownerId || '',
+    ROLE: 'bot',
   };
 }
 
@@ -93,7 +94,7 @@ export async function start(bot, token) {
     timer: null,
   };
   children.set(bot.id, entry);
-  const child = spawn(process.execPath, ['src/index.js'], {
+  const child = spawn(process.execPath, ['src/bot.js'], {
     cwd: ROOT,
     env: envFor(bot, token, port),
     stdio: ['ignore', 'pipe', 'pipe'],

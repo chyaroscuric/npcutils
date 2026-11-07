@@ -82,7 +82,7 @@ U `.env` upiši:
 npm start
 ```
 
-`npm start` pokreće **BYOT panel**. Otvori `DASHBOARD_URL`, prijavi se Discordom i dodaj bot token. Ako želiš stari način s jednim botom iz `.env`, pokreni `npm run start:bot`.
+`npm start` pokreće **BYOT panel** kroz `src/index.js`. Ako hosting panel kao `MAIN_FILE` koristi `src/index.js`, radi automatski: s `CLIENT_ID` + `CLIENT_SECRET` pokreće manager, a bez njih i s `DISCORD_TOKEN` pokreće jednog bota. Otvori `DASHBOARD_URL`, prijavi se Discordom i dodaj bot token. Stari način s jednim botom možeš pokrenuti i s `npm run start:bot`.
 
 ## 3. Da bude uvijek aktivan (24/7)
 

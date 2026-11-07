@@ -3,7 +3,7 @@ module.exports = {
   apps: [
     {
       name: 'npcutils',
-      script: 'src/manager/index.js',
+      script: 'src/index.js',
       autorestart: true,
       restart_delay: 5000,
       max_memory_restart: '300M',
