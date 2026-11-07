@@ -1024,6 +1024,7 @@
       : html`<div class="nav"><a class="nav-row" href="#/" aria-current="page">${icon('ti-server')}Serveri</a></div>`;
     const u = me.user;
     mount($('#sidebar'), html`
+      <span class="nav-pill" id="nav-pill" aria-hidden="true"></span>
       <div class="side-top">${switcher}
         <button type="button" class="btn-icon drawer-close" data-action="drawer-close" aria-label="Zatvori izbornik" data-tip="Zatvori">${icon('ti-x')}</button>
       </div>
@@ -1038,6 +1039,83 @@
     mount($('#topbar-title'), guild
       ? html`${avatar(guild.iconUrl, guild.name, 'avatar-sm avatar-guild')}<span class="truncate">${guild.name}</span>`
       : html`${avatar(me.bot && me.bot.avatarUrl, (me.bot && me.bot.name) || 'Bot', 'avatar-sm')}<span class="truncate">${(me.bot && me.bot.name) || 'Bot'}</span>`);
+    requestAnimationFrame(() => resetNavPill(true));
+  }
+
+  // One neutral pill is shared by every sidebar row. It follows the hovered row
+  // and returns to the active page row when the pointer leaves.
+  function navRowActive() { return $('#sidebar .nav-row[aria-current="page"]'); }
+  function moveNavPill(row, instant = false) {
+    const pill = $('#nav-pill'), sb = $('#sidebar');
+    if (!pill || !sb || !row) return;
+    const scroller = row.closest('.side-scroll');
+    const rr = row.getBoundingClientRect();
+    if (scroller) {
+      const cr = scroller.getBoundingClientRect();
+      if (rr.top < cr.top - 0.5 || rr.bottom > cr.bottom + 0.5) { pill.style.opacity = '0'; return; }
+    }
+    const sr = sb.getBoundingClientRect();
+    if (instant) pill.classList.add('is-instant');
+    pill.style.opacity = '1';
+    pill.style.width = `${rr.width}px`;
+    pill.style.height = `${rr.height}px`;
+    pill.style.transform = `translate(${Math.round(rr.left - sr.left)}px, ${Math.round(rr.top - sr.top)}px)`;
+    if (instant) {
+      void pill.offsetWidth;
+      pill.classList.remove('is-instant');
+    }
+  }
+  function resetNavPill(instant = false) {
+    const sb = $('#sidebar');
+    if (!sb) return;
+    sb.classList.remove('is-nav-hovering');
+    const active = navRowActive();
+    if (active) moveNavPill(active, instant);
+    else { const pill = $('#nav-pill'); if (pill) pill.style.opacity = '0'; }
+  }
+  function initSidebarPill() {
+    const sb = $('#sidebar');
+    if (!sb) return;
+    sb.addEventListener('pointerover', (e) => {
+      if (e.pointerType && e.pointerType !== 'mouse') return;
+      const row = e.target.closest('.nav-row');
+      if (!row) return;
+      const active = navRowActive();
+      sb.classList.toggle('is-nav-hovering', !!active && row !== active);
+      moveNavPill(row);
+    });
+    sb.addEventListener('pointerout', (e) => {
+      const row = e.target.closest('.nav-row');
+      if (!row) return;
+      const to = e.relatedTarget;
+      if (to && to.closest && to.closest('.nav-row')) return;
+      resetNavPill(false);
+    });
+    sb.addEventListener('pointerleave', () => resetNavPill(false));
+    sb.addEventListener('focusin', (e) => {
+      const row = e.target.closest('.nav-row');
+      if (!row) return;
+      const active = navRowActive();
+      sb.classList.toggle('is-nav-hovering', !!active && row !== active);
+      moveNavPill(row);
+    });
+    sb.addEventListener('focusout', (e) => {
+      if (e.relatedTarget && sb.contains(e.relatedTarget)) return;
+      resetNavPill(false);
+    });
+    const scroller = $('.side-scroll', sb);
+    if (scroller) {
+      let scrollTimer = 0;
+      scroller.addEventListener('scroll', () => {
+        const pill = $('#nav-pill');
+        if (pill) pill.classList.add('is-instant');
+        const row = $('.nav-row:hover', sb) || navRowActive();
+        if (row) moveNavPill(row);
+        clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(() => { const p = $('#nav-pill'); if (p) p.classList.remove('is-instant'); }, 120);
+      }, { passive: true });
+    }
+    window.addEventListener('resize', () => resetNavPill(true));
   }
 
   function openDrawer() {
@@ -1046,6 +1124,7 @@
     $('#scrim').classList.add('is-open');
     $('#menu-btn').setAttribute('aria-expanded', 'true');
     $('#main').inert = true;
+    requestAnimationFrame(() => resetNavPill(true));
     const first = $('.nav-row[aria-current="page"]', sb) || $(FOCUSABLE, sb);
     if (first) first.focus();
   }
@@ -2017,28 +2096,73 @@
     const res = await ctx.load(() => Promise.all([guildData(ctx.gid), api('GET', g$(ctx.gid, '/invites'))]));
     if (!res) return;
     const [g, inv] = res;
-    Object.assign(state.page, { g, ctx, lb: inv.leaderboard || [], lbPage: 0 });
+    Object.assign(state.page, { g, ctx, lb: inv.leaderboard || [], lbPage: 0, inviteView: 'table', inviteQuery: '' });
     drawInvites();
+  }
+  function inviteToolbar() {
+    const q = state.page.inviteQuery || '';
+    const view = state.page.inviteView || 'table';
+    return html`<div class="toolbar" data-toolbar>
+      <button type="button" class="tool-btn tool-btn-danger" data-action="invites-reset-all" aria-label="Resetiraj sve invite-ove" data-tip="Resetiraj sve">${icon('ti-restore')}</button>
+      <div class="tool-search ${q ? 'is-open' : ''}" data-tool-search>
+        <input class="tool-search-input" id="invite-search" type="search" placeholder="Pretraži članove" aria-label="Pretraži ljestvicu" autocomplete="off" spellcheck="false" value="${q}" tabindex="${q ? '0' : '-1'}">
+        <button type="button" class="tool-btn tool-btn-accent" data-action="invites-search" aria-label="Pretraži ljestvicu" data-tip="Pretraži" aria-controls="invite-search" aria-expanded="${q ? 'true' : 'false'}">${icon('ti-search')}</button>
+      </div>
+      <div class="tool-settings">
+        <button type="button" class="tool-btn tool-btn-neutral" data-menu-btn aria-haspopup="true" aria-expanded="false" aria-controls="invite-view-menu" aria-label="Prikaz ljestvice" data-tip="Prikaz">${icon('ti-adjustments-horizontal')}</button>
+        <div class="menu tool-menu" id="invite-view-menu" role="menu" aria-label="Prikaz ljestvice" hidden>
+          <p class="opt-group">Prikaz</p>
+          <button type="button" class="menu-item" data-action="invites-view" data-view="table" role="menuitemradio" aria-checked="${view === 'table' ? 'true' : 'false'}" ${view === 'table' ? raw('aria-current="true"') : ''}>${icon('ti-table')}Tablica${icon('ti-check', 'menu-check')}</button>
+          <button type="button" class="menu-item" data-action="invites-view" data-view="list" role="menuitemradio" aria-checked="${view === 'list' ? 'true' : 'false'}" ${view === 'list' ? raw('aria-current="true"') : ''}>${icon('ti-list')}Popis${icon('ti-check', 'menu-check')}</button>
+        </div>
+      </div>
+    </div>`;
   }
   function drawInvites() {
     const { ctx, lb } = state.page;
+    const view = state.page.inviteView || 'table';
     ctx.head = pageHead('Invite-ovi', 'Ukupno = pozvani − otišli + bonus. Lažni su računi mlađi od 7 dana i ne broje se.',
-      lb.length ? html`<button type="button" class="btn" data-action="invites-reset-all">Resetiraj sve</button>` : '');
+      lb.length ? inviteToolbar() : '');
     mount(ctx.el, html`${ctx.head}
       <section class="card" aria-labelledby="lb-h">
         <div class="card-head"><div><h2 class="card-title" id="lb-h">Ljestvica <span class="count num">${fmtNum(lb.length)}</span></h2>
           <p class="card-desc">Bonus dodaješ ikonom olovke ili pretragom člana koji nije na ljestvici.</p></div>
           ${memberSearch('invites', 'Pronađi člana za bonus')}
         </div>
-        <div id="lb-body">${lbBody()}</div>
+        <div id="lb-body" class="lb-view lb-view-${view}">${lbBody()}</div>
       </section>`);
+    wireInviteSearch();
+  }
+  function wireInviteSearch() {
+    const input = $('#invite-search');
+    if (!input) return;
+    input.addEventListener('input', () => {
+      state.page.inviteQuery = input.value;
+      state.page.lbPage = 0;
+      redrawLb(false);
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      const btn = $('[data-action="invites-search"]');
+      if (btn) actions['invites-search'](btn);
+    });
+  }
+  function inviteFiltered() {
+    const q = (state.page.inviteQuery || '').trim().toLocaleLowerCase('hr');
+    return (state.page.lb || []).filter((e) => !q || String((e.user && e.user.name) || '').toLocaleLowerCase('hr').includes(q));
   }
   function lbBody() {
     const { lb, lbPage } = state.page;
     if (!lb.length) return emptyState('ti-user-share', 'Kad netko uđe preko pozivnice, ovdje će se pojaviti ljestvica.');
-    const start = lbPage * LB_PAGE;
-    const rows = lb.slice(start, start + LB_PAGE);
-    const pages = Math.ceil(lb.length / LB_PAGE);
+    const filtered = inviteFiltered();
+    if (!filtered.length) return emptyState('ti-search', `Nema članova koji odgovaraju pretrazi „${(state.page.inviteQuery || '').trim()}“.`);
+    const pages = Math.max(1, Math.ceil(filtered.length / LB_PAGE));
+    const page = Math.min(lbPage, pages - 1);
+    state.page.lbPage = page;
+    const start = page * LB_PAGE;
+    const rows = filtered.slice(start, start + LB_PAGE);
     const acts = (e) => html`<button type="button" class="btn-icon" data-action="invite-bonus" data-id="${e.user.id}" aria-label="Promijeni bonus za ${e.user.name}" data-tip="Promijeni bonus">${icon('ti-pencil')}</button>
       <button type="button" class="btn-icon" data-action="invite-reset" data-id="${e.user.id}" aria-label="Resetiraj invite-ove za ${e.user.name}" data-tip="Resetiraj invite-ove">${icon('ti-restore')}</button>`;
     const bonusTxt = (b) => (b > 0 ? `+${fmtNum(b)}` : fmtNum(b));
@@ -2057,22 +2181,62 @@
         <span class="lb-total" aria-label="Ukupno ${e.total}">${fmtNum(e.total)}</span>
         <span class="lb-meta"><span class="num">${fmtNum(e.regular)} pozvanih · ${fmtNum(e.left)} otišlo · ${fmtNum(e.fake)} lažnih · bonus ${bonusTxt(e.bonus)}</span><span class="btn-group" style="gap:4px;flex:none">${acts(e)}</span></span>
       </li>`)}</ul>
-      ${pages > 1 ? html`<nav class="pager" aria-label="Stranice ljestvice"><span class="muted num">${fmtNum(start + 1)}–${fmtNum(Math.min(lb.length, start + LB_PAGE))} od ${fmtNum(lb.length)}</span>
+      ${pages > 1 ? html`<nav class="pager" aria-label="Stranice ljestvice"><span class="muted num">${fmtNum(start + 1)}–${fmtNum(Math.min(filtered.length, start + LB_PAGE))} od ${fmtNum(filtered.length)}</span>
         <span class="pages">
-          <button type="button" class="btn-icon" data-action="lb-page" data-p="${lbPage - 1}" aria-label="Prethodna stranica" data-tip="Prethodna" ${lbPage === 0 ? raw('disabled') : ''}>${icon('ti-chevron-left')}</button>
-          ${Array.from({ length: pages }, (_, p) => p).filter((p) => p === 0 || p === pages - 1 || Math.abs(p - lbPage) <= 1).map((p, i, arr) => html`${i > 0 && p - arr[i - 1] > 1 ? html`<span class="faint">…</span>` : ''}<button type="button" class="page-btn" data-action="lb-page" data-p="${p}" ${p === lbPage ? raw('aria-current="page"') : ''}>${p + 1}</button>`)}
-          <button type="button" class="btn-icon" data-action="lb-page" data-p="${lbPage + 1}" aria-label="Sljedeća stranica" data-tip="Sljedeća" ${lbPage >= pages - 1 ? raw('disabled') : ''}>${icon('ti-chevron-right')}</button>
+          <button type="button" class="btn-icon" data-action="lb-page" data-p="${page - 1}" aria-label="Prethodna stranica" data-tip="Prethodna" ${page === 0 ? raw('disabled') : ''}>${icon('ti-chevron-left')}</button>
+          ${Array.from({ length: pages }, (_, p) => p).filter((p) => p === 0 || p === pages - 1 || Math.abs(p - page) <= 1).map((p, i, arr) => html`${i > 0 && p - arr[i - 1] > 1 ? html`<span class="faint">…</span>` : ''}<button type="button" class="page-btn" data-action="lb-page" data-p="${p}" ${p === page ? raw('aria-current="page"') : ''}>${p + 1}</button>`)}
+          <button type="button" class="btn-icon" data-action="lb-page" data-p="${page + 1}" aria-label="Sljedeća stranica" data-tip="Sljedeća" ${page >= pages - 1 ? raw('disabled') : ''}>${icon('ti-chevron-right')}</button>
         </span></nav>` : ''}`;
   }
   actions['lb-page'] = (btn) => {
     state.page.lbPage = Number(btn.dataset.p) || 0;
-    mount($('#lb-body'), lbBody());
+    redrawLb(false);
     $('#lb-h')?.scrollIntoView({ block: 'nearest' });
   };
-  function redrawLb() {
+  actions['invites-search'] = (btn) => {
+    const wrap = btn.closest('.tool-search');
+    const input = wrap && $('.tool-search-input', wrap);
+    if (!wrap || !input) return;
+    const open = !wrap.classList.contains('is-open');
+    wrap.classList.toggle('is-open', open);
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    input.tabIndex = open ? 0 : -1;
+    if (open) {
+      input.focus();
+    } else {
+      input.value = '';
+      state.page.inviteQuery = '';
+      state.page.lbPage = 0;
+      redrawLb(false);
+    }
+  };
+  actions['invites-view'] = (btn) => {
+    const view = btn.dataset.view === 'list' ? 'list' : 'table';
+    closeMenus();
+    if ((state.page.inviteView || 'table') === view) return;
+    state.page.inviteView = view;
+    $$('#invite-view-menu [data-view]').forEach((b) => {
+      const on = b.dataset.view === view;
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+      if (on) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
+    });
+    redrawLb(true);
+  };
+  function redrawLb(animate = false) {
     const c = $('#lb-h .count');
-    if (c) c.textContent = fmtNum(state.page.lb.length);
-    mount($('#lb-body'), lbBody());
+    if (c) c.textContent = fmtNum(inviteFiltered().length);
+    const box = $('#lb-body');
+    if (!box) return;
+    box.className = `lb-view lb-view-${state.page.inviteView || 'table'}`;
+    box.classList.remove('is-switching');
+    if (animate) {
+      void box.offsetWidth;
+      mount(box, lbBody());
+      box.classList.add('is-switching');
+      setTimeout(() => box.classList.remove('is-switching'), 300);
+    } else {
+      mount(box, lbBody());
+    }
   }
   function bonusModal(user) {
     const { g, lb } = state.page;
@@ -2104,7 +2268,7 @@
         if (existing) Object.assign(existing, stats);
         else state.page.lb.push({ user: { id: user.id, name: user.name, avatarUrl: user.avatarUrl }, ...stats });
         state.page.lb.sort((a, b) => b.total - a.total);
-        if (!$('#lb-body table') && state.page.lb.length === 1) drawInvites(); else redrawLb();
+        if (!$('[data-toolbar]') && state.page.lb.length === 1) drawInvites(); else redrawLb();
         toast('success', 'Bonus je spremljen', `${user.name} sada ima ${count(stats.total, 'invite', 'invite-a', 'invite-ova')}.`);
         return true;
       },
@@ -3703,6 +3867,7 @@
     }
     state.me.guilds = state.me.guilds || [];
     renderShellFrame();
+    initSidebarPill();
     window.addEventListener('hashchange', router);
     router();
   }
