@@ -53,6 +53,17 @@ test('goodbye payload can attach a generated banner', () => {
   assert.equal(payload.files.length, 1);
 });
 
+test('banner-only mode sends just the image attachment', () => {
+  db.guild('g1').config.goodbye = {
+    channelId: 'c1',
+    banner: { enabled: true, onlyImage: true, backgroundUrl: 'https://example.com/bg.png' },
+  };
+  const payload = members.goodbyePayload(fakeMember(), { banner: Buffer.from('fake-png') });
+  assert.equal(payload.embeds, undefined);
+  assert.equal(payload.content, undefined);
+  assert.equal(payload.files.length, 1);
+});
+
 test('sendGoodbye sends to the configured channel', async () => {
   const sent = [];
   const member = fakeMember();

@@ -49,7 +49,7 @@ normalizer.
 
 | Key | Owner | Shape / notes |
 | --- | --- | --- |
-| `config.welcome` | `features/members.js` | `{ channelId, message, imageUrl, banner }`; `banner` is normalized by `features/welcomeBanner.js`: `{ enabled, backgroundUrl, title, subtitle, accentColor, nameColor, overlay, showTitle, showSubtitle, avatarX, avatarY, avatarSize, nameX, nameY, nameSize }` |
+| `config.welcome` | `features/members.js` | `{ channelId, message, imageUrl, banner }`; `banner` is normalized by `features/welcomeBanner.js`: `{ enabled, backgroundUrl, title, subtitle, accentColor, nameColor, overlay, onlyImage, showTitle, showSubtitle, avatarX, avatarY, avatarSize, nameX, nameY, nameSize }` |
 | `config.boost` | `features/members.js` | `{ channelId, message, imageUrl }` |
 | `config.goodbye` | `features/members.js` | `{ channelId, message, imageUrl }`; sent when a member leaves |
 | `config.autoroles` | `features/members.js` | array of role IDs |

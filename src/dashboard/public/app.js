@@ -1725,13 +1725,15 @@
               <div class="section-gap">
                 <h3 class="sub-title">Dizajner bannera</h3>
                 <label class="toggle"><input type="checkbox" role="switch" name="bannerEnabled" ${banner.enabled ? raw('checked') : ''}><span class="track" aria-hidden="true"></span><span>Uključi automatski banner</span></label>
-                <p class="help">Učitaj pozadinu, zatim povuci <strong>krug s avatarom</strong> i <strong>ime</strong> tamo gdje želiš. Ime i avatar se automatski popunjavaju za svakog člana.</p>
+                <p class="help">Učitaj pozadinu, zatim povuci <strong>krug s avatarom</strong> i <strong>ime</strong> tamo gdje želiš. Mali krug na avataru i tekstu mijenja veličinu. Ime i avatar se automatski popunjavaju za svakog člana.</p>
+                <label class="toggle"><input type="checkbox" role="switch" name="bannerOnlyImage" ${banner.onlyImage ? raw('checked') : ''}><span class="track" aria-hidden="true"></span><span>Pošalji samo sliku bannera (bez embeda i teksta)</span></label>
+                <p class="help">Kad je uključeno, bot pošalje samo PNG banner. Naslov, podnaslov i obična poruka se ne šalju.</p>
                 <div class="banner-designer">
                   <div class="banner-canvas" data-banner-canvas style="--avatar-size:${layout.avatarSize};--name-size:${layout.nameSize};--overlay:${banner.overlay ?? 0.32}">
                     <img data-banner-bg src="${banner.backgroundUrl || ''}" alt="" ${banner.backgroundUrl ? '' : raw('hidden')}>
                     <div class="banner-overlay"></div>
-                    <div class="banner-drag-avatar" data-drag="avatar" style="left:${layout.avatarX * 100}%;top:${layout.avatarY * 100}%;background-image:${sampleAvatar ? `url('${sampleAvatar}')` : 'none'};border-color:${banner.accentColor || '#f472b6'}"></div>
-                    <div class="banner-drag-name" data-drag="name" style="left:${layout.nameX * 100}%;top:${layout.nameY * 100}%;color:${banner.nameColor || '#1f2937'}">${sampleName}</div>
+                    <div class="banner-drag-avatar" data-drag="avatar" style="left:${layout.avatarX * 100}%;top:${layout.avatarY * 100}%;background-image:${sampleAvatar ? `url('${sampleAvatar}')` : 'none'};border-color:${banner.accentColor || '#f472b6'}"><span class="banner-resize" data-resize="avatar" aria-hidden="true"></span></div>
+                    <div class="banner-drag-name" data-drag="name" style="left:${layout.nameX * 100}%;top:${layout.nameY * 100}%;color:${banner.nameColor || '#1f2937'}">${sampleName}<span class="banner-resize" data-resize="name" aria-hidden="true"></span></div>
                     <p class="banner-empty" data-banner-empty ${banner.backgroundUrl ? raw('hidden') : ''}>Učitaj pozadinu da počneš.</p>
                   </div>
                   <div class="stack">
@@ -1750,7 +1752,7 @@
                 </div>
                 <div class="banner-controls">
                   <label class="banner-control"><span>Veličina avatara</span><input type="range" data-banner-size="avatar" min="0.05" max="0.4" step="0.005" value="${layout.avatarSize}"></label>
-                  <label class="banner-control"><span>Veličina imena</span><input type="range" data-banner-size="name" min="0.03" max="0.2" step="0.002" value="${layout.nameSize}"></label>
+                  <label class="banner-control"><span>Veličina teksta</span><input type="range" data-banner-size="name" min="0.03" max="0.2" step="0.002" value="${layout.nameSize}"></label>
                   ${field({ name: 'bannerOverlay', label: 'Zatamnjenje', id: id.boverlay,
                     control: html`<input class="input" id="${id.boverlay}" name="bannerOverlay" data-banner-overlay type="range" min="0" max="0.8" step="0.05" value="${banner.overlay ?? 0.32}">` })}
                 </div>
@@ -1838,6 +1840,7 @@
     formValue(f, 'enabled'), formValue(f, 'channelId'), formValue(f, 'message'), formValue(f, 'imageUrl'),
     formValue(f, 'bannerEnabled'), formValue(f, 'bannerUrl'), formValue(f, 'bannerTitle'), formValue(f, 'bannerSubtitle'),
     formValue(f, 'bannerAccent'), formValue(f, 'bannerName'), formValue(f, 'bannerOverlay'),
+    formValue(f, 'bannerOnlyImage'),
     formValue(f, 'bannerShowTitle'), formValue(f, 'bannerShowSubtitle'),
     formValue(f, 'bannerAvatarX'), formValue(f, 'bannerAvatarY'), formValue(f, 'bannerAvatarSize'),
     formValue(f, 'bannerNameX'), formValue(f, 'bannerNameY'), formValue(f, 'bannerNameSize'),
@@ -1851,6 +1854,7 @@
       accentColor: formValue(f, 'bannerAccent') || null,
       nameColor: formValue(f, 'bannerName') || null,
       overlay: Number(formValue(f, 'bannerOverlay') ?? 0.32),
+      onlyImage: Boolean(formValue(f, 'bannerOnlyImage')),
       showTitle: Boolean(formValue(f, 'bannerShowTitle')),
       showSubtitle: Boolean(formValue(f, 'bannerShowSubtitle')),
       avatarX: Number(formValue(f, 'bannerAvatarX') ?? 0.16),
@@ -1875,6 +1879,33 @@
     const yInput = form.querySelector(`input[name="banner${kind === 'avatar' ? 'Avatar' : 'Name'}Y"]`);
     if (xInput) xInput.value = left.toFixed(4);
     if (yInput) yInput.value = top.toFixed(4);
+  }
+  function resizeBanner(drag, event) {
+    const handle = drag.handle;
+    const canvas = handle.closest('[data-banner-canvas]');
+    const form = canvas?.closest('form');
+    if (!canvas || !form) return;
+    const rect = canvas.getBoundingClientRect();
+    const own = handle.getBoundingClientRect();
+    const cx = own.left + own.width / 2;
+    const cy = own.top + own.height / 2;
+    if (drag.resize === 'avatar') {
+      const distance = Math.hypot(event.clientX - cx, event.clientY - cy);
+      const size = Math.min(0.4, Math.max(0.05, (distance * 2) / rect.width));
+      const input = form.querySelector('input[name="bannerAvatarSize"]');
+      if (input) input.value = size.toFixed(4);
+      const slider = form.querySelector('[data-banner-size="avatar"]');
+      if (slider) slider.value = size;
+      canvas.style.setProperty('--avatar-size', size);
+    } else {
+      const distance = Math.abs(event.clientY - cy);
+      const size = Math.min(0.2, Math.max(0.03, (distance * 2) / (rect.height * 2.1)));
+      const input = form.querySelector('input[name="bannerNameSize"]');
+      if (input) input.value = size.toFixed(4);
+      const slider = form.querySelector('[data-banner-size="name"]');
+      if (slider) slider.value = size;
+      canvas.style.setProperty('--name-size', size);
+    }
   }
   inputs.msg = (f) => updateMsgPreview(f);
   actions['insert-var'] = (btn) => {
@@ -4801,6 +4832,16 @@
       }
     });
     document.addEventListener('pointerdown', (e) => {
+      const resize = e.target.closest && e.target.closest('[data-resize]');
+      if (resize) {
+        const handle = resize.closest('[data-drag]');
+        if (!handle || !handle.closest('[data-banner-canvas]')) return;
+        e.preventDefault();
+        bannerDrag = { handle, pointerId: e.pointerId, resize: resize.dataset.resize };
+        handle.setPointerCapture?.(e.pointerId);
+        handle.classList.add('is-dragging');
+        return;
+      }
       const handle = e.target.closest && e.target.closest('[data-drag]');
       if (!handle || !handle.closest('[data-banner-canvas]')) return;
       e.preventDefault();
@@ -4810,6 +4851,10 @@
     });
     document.addEventListener('pointermove', (e) => {
       if (!bannerDrag || e.pointerId !== bannerDrag.pointerId) return;
+      if (bannerDrag.resize) {
+        resizeBanner(bannerDrag, e);
+        return;
+      }
       const canvas = bannerDrag.handle.closest('[data-banner-canvas]');
       const rect = canvas.getBoundingClientRect();
       setBannerDrag(bannerDrag.handle, (e.clientX - rect.left) / rect.width, (e.clientY - rect.top) / rect.height);

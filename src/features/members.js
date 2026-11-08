@@ -22,6 +22,9 @@ export async function giveAutoroles(member) {
 export function welcomePayload(member, inviterId, { banner = null } = {}) {
   const g = db.guild(member.guild.id);
   const cfg = g.config.welcome;
+  if (banner && normalizeBanner(cfg?.banner).onlyImage) {
+    return { files: [new AttachmentBuilder(banner, { name: 'welcome.png' })] };
+  }
   const inviterStats = inviterId ? invites.stats(g, inviterId) : null;
   const text = fillTemplate(cfg?.message || DEFAULT_WELCOME, {
     user: `${member}`,
@@ -91,6 +94,9 @@ export async function sendWelcome(member, inviterId) {
 export function goodbyePayload(member, { banner = null } = {}) {
   const g = db.guild(member.guild.id);
   const cfg = g.config.goodbye;
+  if (banner && normalizeBanner(cfg?.banner, GOODBYE_BANNER).onlyImage) {
+    return { files: [new AttachmentBuilder(banner, { name: 'goodbye.png' })] };
+  }
   const inviterId = g.joins[member.id]?.inviterId ?? null;
   const inviterStats = inviterId ? invites.stats(g, inviterId) : null;
   const username = member.user?.username ?? 'Nepoznat član';

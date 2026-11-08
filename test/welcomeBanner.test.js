@@ -44,6 +44,7 @@ test('banner layout positions and sizes are clamped', () => {
     nameSize: 0.01,
     showTitle: false,
     showSubtitle: false,
+    onlyImage: true,
   });
   assert.equal(banner.avatarX, 0);
   assert.equal(banner.avatarY, 1);
@@ -53,6 +54,7 @@ test('banner layout positions and sizes are clamped', () => {
   assert.equal(banner.nameSize, 0.03);
   assert.equal(banner.showTitle, false);
   assert.equal(banner.showSubtitle, false);
+  assert.equal(banner.onlyImage, true);
 });
 
 test('banner renders a PNG without a background or avatar', async () => {

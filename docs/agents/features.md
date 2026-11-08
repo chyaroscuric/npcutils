@@ -38,6 +38,8 @@ and sizes for the avatar and name (`avatarX/Y/Size`, `nameX/Y/Size`) and lets th
 drag both over the background. `POST /guilds/:gid/banner-preview` renders a live preview.
 If the background or avatar fetch fails, the renderer uses a flat fallback;
 `buildWelcomePayload()` still falls back to the normal embed if the whole render fails.
+`banner.onlyImage` makes the welcome/goodbye payload contain only the generated PNG
+attachment, without an embed or content.
 
 ### `stats.js` + `socialStats.js`
 
