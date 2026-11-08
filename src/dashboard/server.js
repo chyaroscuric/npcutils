@@ -10,13 +10,14 @@ import { recentActivity } from '../features/activity.js';
 import * as giveaways from '../features/giveaways.js';
 import * as invites from '../features/invites.js';
 import { DEFAULT_BOOST, DEFAULT_GOODBYE, DEFAULT_WELCOME, GOODBYE_BANNER, boostPayload, buildGoodbyePayload, buildWelcomePayload } from '../features/members.js';
-import { normalizeBanner } from '../features/welcomeBanner.js';
+import { normalizeBanner, processBannerImage, renderWelcomeBanner } from '../features/welcomeBanner.js';
 import * as music from '../features/music.js';
 import * as antinuke from '../features/antinuke.js';
 import * as antilink from '../features/antilink.js';
 import * as birthdays from '../features/birthdays.js';
 import * as botSettings from '../features/botSettings.js';
 import * as counting from '../features/counting.js';
+import * as freeGames from '../features/freeGames.js';
 import * as levels from '../features/levels.js';
 import * as kaladont from '../features/games/kaladont.js';
 import * as toplo from '../features/games/toplo.js';
@@ -173,7 +174,7 @@ export function startDashboard(client, port) {
 
   // ---------- API ----------
   const api = express.Router();
-  api.use(express.json({ limit: '100kb' }));
+  api.use(express.json({ limit: '6mb' }));
 
   api.use((req, res, next) => {
     // When running behind the BYOT manager, the manager authenticates the user and
@@ -368,6 +369,7 @@ export function startDashboard(client, port) {
         levels: { enabled: levels.getConfig(guild.id).enabled },
         social: { enabled: socialAlerts.getConfig(guild.id).enabled, accountCount: socialAlerts.getConfig(guild.id).accounts.length },
         birthdays: { enabled: birthdays.getConfig(guild.id).enabled, count: Object.keys(g.birthdays ?? {}).length },
+        freeGames: { enabled: freeGames.getConfig(guild.id).enabled },
       },
       activity: recentActivity(guild.id),
     });
@@ -430,6 +432,41 @@ export function startDashboard(client, port) {
       ok(res);
     });
   }
+
+  api.post('/guilds/:gid/banner-upload', express.raw({ type: ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'], limit: '8mb' }), async (req, res) => {
+    if (!Buffer.isBuffer(req.body) || !req.body.length) throw new UserError('Odaberi sliku (PNG, JPG, WebP ili GIF).');
+    try {
+      const url = await processBannerImage(req.body);
+      ok(res, { url });
+    } catch (err) {
+      console.warn('[dashboard] banner upload:', err.message);
+      throw new UserError('Slika nije ispravna ili je prevelika. Pokusaj s drugom slikom.');
+    }
+  });
+
+  api.post('/guilds/:gid/banner-preview', async (req, res) => {
+    const kind = req.body?.kind === 'goodbye' ? 'goodbye' : 'welcome';
+    const banner = normalizeBanner(req.body?.banner, kind === 'goodbye' ? GOODBYE_BANNER : {});
+    if (!banner.enabled || !banner.backgroundUrl) throw new UserError('Ukljuci banner i odaberi pozadinsku sliku.');
+    try {
+      const buffer = await renderWelcomeBanner({
+        backgroundUrl: banner.backgroundUrl,
+        avatarUrl: req.member.user.displayAvatarURL({ extension: 'png', size: 512 }),
+        name: req.member.displayName ?? req.member.user.username,
+        serverName: req.guild.name,
+        title: banner.title,
+        subtitle: banner.subtitle,
+        accentColor: banner.accentColor,
+        nameColor: banner.nameColor,
+        overlay: banner.overlay,
+        memberCount: req.guild.memberCount,
+      });
+      res.type('png').send(buffer);
+    } catch (err) {
+      console.warn('[dashboard] banner preview:', err.message);
+      throw new UserError('Pregled bannera nije uspio. Provjeri sliku i pokusaj ponovno.');
+    }
+  });
 
   api.put('/guilds/:gid/autoroles', (req, res) => {
     const ids = Array.isArray(req.body?.roleIds) ? [...new Set(req.body.roleIds.map(String))] : [];
@@ -988,6 +1025,54 @@ export function startDashboard(client, port) {
     }
   });
 
+  // ---------- free games ----------
+  const freeGamesPayload = (guild) => {
+    const cfg = freeGames.getConfig(guild.id);
+    const channel = cfg.channelId && guild.channels.cache.get(cfg.channelId);
+    const role = cfg.roleId && guild.roles.cache.get(cfg.roleId);
+    return {
+      config: cfg,
+      channel: channel ? { id: channel.id, name: channel.name } : null,
+      role: role ? { id: role.id, name: role.name } : null,
+      cached: freeGames.cachedGames(),
+      pollHours: freeGames.pollHours,
+    };
+  };
+  api.get('/guilds/:gid/freegames', (req, res) => res.json(freeGamesPayload(req.guild)));
+  api.put('/guilds/:gid/freegames', (req, res) => {
+    const body = req.body ?? {};
+    const enabled = Boolean(body.enabled);
+    const channelId = body.channelId ? textChannel(req.guild, body.channelId).id : null;
+    if (enabled && !channelId) throw new UserError('Odaberi kanal za obavijesti o besplatnim igrama.');
+    let roleId = null;
+    if (body.roleId) {
+      const role = req.guild.roles.cache.get(String(body.roleId));
+      if (!role) throw new UserError('Odabrana rola više ne postoji.');
+      roleId = role.id;
+    }
+    freeGames.saveConfig(req.guild.id, {
+      enabled,
+      channelId,
+      roleId,
+      epic: body.epic !== false,
+      steam: body.steam !== false,
+      message: String(body.message ?? '').slice(0, 2000),
+    });
+    ok(res, freeGamesPayload(req.guild));
+  });
+  api.post('/guilds/:gid/freegames/check', async (req, res) => {
+    const result = await freeGames.checkGuild(req.guild, { notify: req.body?.notify !== false });
+    ok(res, { ...result, ...freeGamesPayload(req.guild) });
+  });
+  api.post('/guilds/:gid/freegames/test', async (req, res) => {
+    try {
+      const games = await freeGames.testNotification(req.guild);
+      ok(res, { games, ...freeGamesPayload(req.guild) });
+    } catch (err) {
+      throw err instanceof UserError ? err : new UserError(err.message);
+    }
+  });
+
   // ---------- send message / embed ----------
   api.post('/guilds/:gid/messages/send', async (req, res) => {
     const channel = textChannel(req.guild, req.body?.channelId);
@@ -1037,6 +1122,7 @@ export function startDashboard(client, port) {
   api.use((err, req, res, next) => {
     if (err instanceof UserError) return res.status(400).json({ error: err.message });
     if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Neispravan JSON.' });
+    if (err.type === 'entity.too.large') return res.status(400).json({ error: 'Slika ili podaci su preveliki (najviše 8 MB).' });
     console.error('[dashboard]', err);
     res.status(500).json({ error: 'Došlo je do greške na serveru. Pokušaj ponovno.' });
   });

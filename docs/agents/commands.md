@@ -77,6 +77,7 @@ contexts fail fast.
 | Games | `/zastava`, `/wordle`, `/kaladont start\|stop`, `/toplohladno start\|stop`, `/mafia start\|stop\|stats`, `/fish`, `/ship`, `/counting ...` |
 | Levels | `/rank`, `/top`, `/levels status\|ukljuci\|postavke\|reset` |
 | Messaging | `/posalji` |
+| Free games | `/freegames` |
 | Moderation | `/purge`, `/ban`, `/unban`, `/kick`, `/timeout`, `/untimeout`, `/warn`, `/warnings`, `/clearwarns`, `/slowmode`, `/lock`, `/unlock`, `/modlog` |
 | Clone | `/klon izvor`, `/klon cilj`, `/klon status`, `/klon pokreni` |
 | Anti-nuke | `/antinuke status\|ukljuci\|pravilo\|postavke\|whitelist` |

@@ -18,6 +18,7 @@
 | `MANAGER_SECRET` | manager | generated at manager startup; used for proxy auth |
 | `FFMPEG_PATH`, `YTDLP_PATH` | optional | custom music binaries |
 | `SOCIAL_POLL_MINUTES` | optional | social alert poll interval (default 5, min 2) |
+| `FREE_GAMES_POLL_HOURS` | optional | free game poll interval (default 6, min 1) |
 | `BOT_TIMEZONE` | optional | birthday timezone (default `Europe/Zagreb`) |
 
 Copy `.env.example` to `.env`. Never commit `.env`.

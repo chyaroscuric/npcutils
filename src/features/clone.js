@@ -128,6 +128,17 @@ export function copyBotSettings(sourceId, targetId, roleMap, channelMap) {
       accounts: (c.socialAlerts.accounts ?? []).map((account) => ({ ...account, state: {} })),
     };
   }
+  if (c.freeGames && ch(c.freeGames.channelId)) {
+    config.freeGames = {
+      ...c.freeGames,
+      channelId: ch(c.freeGames.channelId),
+      roleId: role(c.freeGames.roleId),
+      lastEpic: [],
+      lastSteam: [],
+      lastCheckedAt: null,
+      lastError: null,
+    };
+  }
   dst.config = config;
 }
 

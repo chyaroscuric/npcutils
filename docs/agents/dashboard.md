@@ -46,7 +46,9 @@ Use `textChannel(guild, id)` to validate text/announcement channels, `optionalTe
 | `/api/me`, `/api/bot`, `/api/bot/status` | user, guild list, bot info, global presence |
 | `/guilds/:gid` | guild snapshot: channels, roles, config summaries, activity |
 | `/guilds/:gid/access` | dashboard users |
-| `/guilds/:gid/welcome`, `/boost` | message config + `/test` |
+| `/guilds/:gid/welcome`, `/boost`, `/goodbye` | message config + `/test`; welcome/goodbye accept a `banner` object |
+| `/guilds/:gid/banner-upload` | raw image upload, cropped to 1024×512 and returned as a data URL |
+| `/guilds/:gid/banner-preview` | rendered PNG preview for the banner designer |
 | `/guilds/:gid/autoroles` | autorole IDs |
 | `/guilds/:gid/stats` | stats channels snapshot/setup/refresh/remove |
 | `/guilds/:gid/counting` | counting setup/reset/disable |
@@ -61,6 +63,7 @@ Use `textChannel(guild, id)` to validate text/announcement channels, `optionalTe
 | `/guilds/:gid/games` | active kaladont + toplo-hladno, start/stop |
 | `/guilds/:gid/music` | queue and controls |
 | `/guilds/:gid/social` | social notification config, accounts, check, test |
+| `/guilds/:gid/freegames` | Epic/Steam free game config, cached list, check, test |
 | `/guilds/:gid/birthdays` | birthday config, list, remove, test |
 | `/guilds/:gid/messages/send` | send a plain message/embed as the bot |
 

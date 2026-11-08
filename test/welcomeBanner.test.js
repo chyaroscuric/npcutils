@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BANNER_SIZE, normalizeBanner, renderWelcomeBanner } from '../src/features/welcomeBanner.js';
+import { createCanvas } from '@napi-rs/canvas';
+import { BANNER_SIZE, normalizeBanner, processBannerImage, renderWelcomeBanner } from '../src/features/welcomeBanner.js';
 
 test('banner config is normalized', () => {
   const banner = normalizeBanner({
@@ -47,4 +48,16 @@ test('banner renders a PNG without a background or avatar', async () => {
   assert.deepEqual([...buffer.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
   assert.equal(BANNER_SIZE.width, 1024);
   assert.equal(BANNER_SIZE.height, 512);
+});
+
+test('uploaded images are cropped into a data URL', async () => {
+  const source = createCanvas(64, 64);
+  const ctx = source.getContext('2d');
+  ctx.fillStyle = '#ff00aa';
+  ctx.fillRect(0, 0, 64, 64);
+  const dataUrl = await processBannerImage(source.toBuffer('image/png'));
+  assert.match(dataUrl, /^data:image\/jpeg;base64,/);
+  const banner = normalizeBanner({ enabled: true, backgroundUrl: dataUrl });
+  assert.equal(banner.backgroundUrl, dataUrl);
+  assert.equal(banner.enabled, true);
 });

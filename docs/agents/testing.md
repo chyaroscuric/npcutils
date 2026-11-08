@@ -63,6 +63,7 @@ test('normalizer keeps old data', () => {
 | `counting.test.js` | correct/wrong numbers, reset |
 | `games.test.js` | flags, wordle, kaladont, dictionary, ship |
 | `fishing.test.js` | fish table, XP levels, catching, cooldown, selling |
+| `freeGames.test.js` | Epic/Steam parsers, new-game detection, config, payload |
 | `mafia.test.js` | role distribution and win conditions |
 | `members.test.js` | goodbye placeholders, default message, channel send |
 | `invites.test.js` | joins/leaves/fakes/bonus |

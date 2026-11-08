@@ -123,6 +123,8 @@ design.md                  mandatory dashboard design system
 - Social notifications poll public pages. They are best-effort: YouTube uses RSS and the
   `/live` page, Twitch uses DecAPI, TikTok reads the public profile page. The first check
   is only a baseline and never sends a notification.
+- Free game alerts use Epic's public promotions endpoint and GamerPower for Steam. Both
+  are third-party/public feeds; failures are recorded per guild in `lastError`.
 - Welcome and goodbye banners render with `@napi-rs/canvas`. If the background or avatar
   cannot be fetched, the bot falls back to the normal embed.
 - Birthday dates use `Europe/Zagreb` by default (`BOT_TIMEZONE` overrides it). Feb 29 is

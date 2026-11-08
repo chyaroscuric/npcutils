@@ -71,6 +71,7 @@ normalizer.
 | `birthdays` | `features/birthdays.js` | userId -> `{ day, month, year, setAt, lastCelebrated }` |
 | `birthdayRoles` | `features/birthdays.js` | userId -> `{ year, roleId }` (active birthday role) |
 | `config.socialAlerts` | `features/socialAlerts.js` | `{ enabled, channelId, roleId, message, channels, accounts: [...] }`; `channels` maps `platform:event` to a channel ID override |
+| `config.freeGames` | `features/freeGames.js` | `{ enabled, channelId, roleId, epic, steam, message, lastEpic, lastSteam, lastCheckedAt, lastError }` |
 
 ### Social alert account shape
 

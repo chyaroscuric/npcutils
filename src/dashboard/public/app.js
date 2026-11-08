@@ -933,6 +933,7 @@
       { key: 'levels', label: 'Leveli', icon: 'ti-chart-line' },
       { key: 'messages', label: 'Poruke', icon: 'ti-send' },
       { key: 'social', label: 'Obavijesti', icon: 'ti-broadcast' },
+      { key: 'freegames', label: 'Besplatne igre', icon: 'ti-gift' },
     ] },
   ];
   const PAGE_KEYS = NAV.flatMap((g) => g.items.map((i) => i.key));
@@ -1515,6 +1516,7 @@
     ticket_open: 'ti-ticket', ticket_close: 'ti-ticket-off',
     giveaway_start: 'ti-gift', giveaway_end: 'ti-confetti', music: 'ti-music',
     social: 'ti-broadcast',
+    freegames: 'ti-gift',
     birthday: 'ti-cake',
     antinuke: 'ti-shield', moderation: 'ti-gavel',
   };
@@ -1549,6 +1551,7 @@
       { page: 'counting', name: 'Brojanje', on: !!(c.counting && c.counting.enabled), meta: c.counting && c.counting.enabled ? `Trenutni broj: ${fmtNum(c.counting.current || 0)}` : 'Igra brojanja je isključena' },
       { page: 'levels', name: 'Leveli', on: !!(c.levels && c.levels.enabled), meta: c.levels && c.levels.enabled ? 'Broje se poruke i voice vrijeme' : 'Leveli su isključeni' },
       { page: 'social', name: 'Obavijesti s mreza', on: !!(c.social && c.social.enabled), meta: c.social && c.social.enabled ? `${count(c.social.accountCount || 0, 'racun', 'racuna', 'racuna')} se prati` : 'Nema obavijesti s mreza' },
+      { page: 'freegames', name: 'Besplatne igre', on: !!(c.freeGames && c.freeGames.enabled), meta: c.freeGames && c.freeGames.enabled ? 'Epic i Steam obavijesti su ukljucene' : 'Nema obavijesti o besplatnim igrama' },
       { page: 'birthdays', name: 'Rodendani', on: !!(c.birthdays && c.birthdays.enabled), meta: c.birthdays && c.birthdays.enabled ? `${count(c.birthdays.count || 0, 'rodendan', 'rodendana', 'rodendana')} spremljeno` : 'Cestitke su iskljucene' },
     ];
     const activity = g.activity || [];
@@ -1686,7 +1689,7 @@
     const title = isW ? 'Poruka dobrodošlice' : isG ? 'Poruka odlaska' : 'Poruka za boost';
     const desc = isW ? 'Bot je šalje kad netko uđe na server.' : isG ? 'Bot je šalje kad netko napusti server.' : 'Bot je šalje kad netko boosta server.';
     const toggleLabel = isW ? 'Šalji poruku dobrodošlice' : isG ? 'Šalji poruku odlaska' : 'Šalji poruku za boost';
-    const id = { ch: uid('f'), msg: uid('f'), img: uid('f'), banner: uid('f'), btitle: uid('f'), bsub: uid('f'), bacc: uid('f'), bname: uid('f') };
+    const id = { ch: uid('f'), msg: uid('f'), img: uid('f'), banner: uid('f'), btitle: uid('f'), bsub: uid('f'), bacc: uid('f'), bname: uid('f'), boverlay: uid('f') };
     const showBanner = isW || isG;
     const banner = showBanner ? (c.banner || {}) : {};
     const bannerTitleDefault = isG ? 'Dovidenja od {server}' : 'Dobrodošao/la kod {server}';
@@ -1710,20 +1713,39 @@
               control: html`<input class="input" id="${id.img}" name="imageUrl" type="url" maxlength="2048" value="${c.imageUrl || ''}" placeholder="https://example.com/slika.png" aria-describedby="${id.img}-help">` })}
             ${showBanner ? html`
               <div class="section-gap">
-                <label class="toggle"><input type="checkbox" role="switch" name="bannerEnabled" ${banner.enabled ? raw('checked') : ''}><span class="track" aria-hidden="true"></span><span>Automatski banner s avatarom i imenom</span></label>
-                <p class="help">Bot nacrta pozadinsku sliku, stavi avatar ${isG ? 'clana koji odlazi' : 'novog clana'} u krug i njegovo ime u bijelu traku. Ako slika ne radi, salje se obicna poruka.</p>
-              </div>
-              ${field({ name: 'bannerUrl', label: 'Pozadina bannera (URL)', id: id.banner, help: 'Preporuka: siroka slika barem 1024×512 px (PNG ili JPG).',
-                control: html`<input class="input" id="${id.banner}" name="bannerUrl" type="url" maxlength="2048" value="${banner.backgroundUrl || ''}" placeholder="https://example.com/pozadina.png" aria-describedby="${id.banner}-help">` })}
-              ${field({ name: 'bannerTitle', label: 'Tekst na banneru', id: id.btitle, help: 'Varijable: {server}, {username}, {memberCount}.',
-                control: html`<input class="input" id="${id.btitle}" name="bannerTitle" maxlength="160" value="${banner.title || bannerTitleDefault}" aria-describedby="${id.btitle}-help">` })}
-              ${field({ name: 'bannerSubtitle', label: 'Manji tekst ispod', id: id.bsub, help: 'Ostavi prazno ako ne zelis drugi red.',
-                control: html`<input class="input" id="${id.bsub}" name="bannerSubtitle" maxlength="160" value="${banner.subtitle || bannerSubtitleDefault}" aria-describedby="${id.bsub}-help">` })}
-              <div class="field-row">
-                ${field({ name: 'bannerAccent', label: 'Boja okvira avatara', id: id.bacc,
-                  control: html`<input class="input" id="${id.bacc}" name="bannerAccent" type="color" value="${banner.accentColor || '#f472b6'}">` })}
-                ${field({ name: 'bannerName', label: 'Boja imena', id: id.bname,
-                  control: html`<input class="input" id="${id.bname}" name="bannerName" type="color" value="${banner.nameColor || '#1f2937'}">` })}
+                <h3 class="sub-title">Dizajner bannera</h3>
+                <label class="toggle"><input type="checkbox" role="switch" name="bannerEnabled" ${banner.enabled ? raw('checked') : ''}><span class="track" aria-hidden="true"></span><span>Uključi automatski banner</span></label>
+                <p class="help">Bot stavi avatar ${isG ? 'člana koji odlazi' : 'novog člana'} u krug i njegovo ime u bijelu traku. Učitaj sliku ili zalijepi URL, pa provjeri pregled.</p>
+                <div class="banner-designer">
+                  <div class="banner-preview-box">
+                    <img data-banner-preview src="${banner.backgroundUrl || ''}" alt="Pregled bannera" ${banner.backgroundUrl ? '' : raw('hidden')}>
+                    <p data-banner-empty ${banner.backgroundUrl ? raw('hidden') : ''}>Nema pozadine. Učitaj sliku ispod.</p>
+                  </div>
+                  <div class="stack">
+                    <input type="hidden" name="bannerUrl" value="${banner.backgroundUrl || ''}">
+                    <label class="btn">${icon('ti-upload')}Učitaj sliku<input type="file" data-banner-file accept="image/png,image/jpeg,image/webp,image/gif" hidden></label>
+                    <button type="button" class="btn" data-action="banner-remove">${icon('ti-trash')}Ukloni sliku</button>
+                    <input class="input" data-banner-external type="url" maxlength="2048" value="${banner.backgroundUrl && !String(banner.backgroundUrl).startsWith('data:') ? banner.backgroundUrl : ''}" placeholder="ili zalijepi URL slike">
+                    <p class="help">PNG, JPG, WebP ili GIF do 8 MB. Slika se automatski obrezuje na 1024×512.</p>
+                  </div>
+                </div>
+                <div class="field-row">
+                  ${field({ name: 'bannerTitle', label: 'Tekst na banneru', id: id.btitle, help: 'Varijable: {server}, {username}, {memberCount}.',
+                    control: html`<input class="input" id="${id.btitle}" name="bannerTitle" maxlength="160" value="${banner.title || bannerTitleDefault}" aria-describedby="${id.btitle}-help">` })}
+                  ${field({ name: 'bannerSubtitle', label: 'Manji tekst ispod', id: id.bsub, help: 'Ostavi prazno ako ne želiš drugi red.',
+                    control: html`<input class="input" id="${id.bsub}" name="bannerSubtitle" maxlength="160" value="${banner.subtitle || bannerSubtitleDefault}" aria-describedby="${id.bsub}-help">` })}
+                </div>
+                <div class="field-row">
+                  ${field({ name: 'bannerAccent', label: 'Boja okvira avatara', id: id.bacc,
+                    control: html`<input class="input" id="${id.bacc}" name="bannerAccent" type="color" value="${banner.accentColor || '#f472b6'}">` })}
+                  ${field({ name: 'bannerName', label: 'Boja imena', id: id.bname,
+                    control: html`<input class="input" id="${id.bname}" name="bannerName" type="color" value="${banner.nameColor || '#1f2937'}">` })}
+                  ${field({ name: 'bannerOverlay', label: 'Zatamnjenje', id: id.boverlay,
+                    control: html`<input class="input" id="${id.boverlay}" name="bannerOverlay" type="range" min="0" max="0.8" step="0.05" value="${banner.overlay ?? 0.32}">` })}
+                </div>
+                <div class="form-actions">
+                  <button type="button" class="btn" data-action="banner-preview">${icon('ti-eye')}Osvježi pregled bannera</button>
+                </div>
               </div>` : ''}
             <div class="field">
               <span class="label" id="${id.msg}-vars">Varijable</span>
@@ -1786,8 +1808,19 @@
   const msgSnapshot = (f) => JSON.stringify([
     formValue(f, 'enabled'), formValue(f, 'channelId'), formValue(f, 'message'), formValue(f, 'imageUrl'),
     formValue(f, 'bannerEnabled'), formValue(f, 'bannerUrl'), formValue(f, 'bannerTitle'), formValue(f, 'bannerSubtitle'),
-    formValue(f, 'bannerAccent'), formValue(f, 'bannerName'),
+    formValue(f, 'bannerAccent'), formValue(f, 'bannerName'), formValue(f, 'bannerOverlay'),
   ]);
+  function bannerFormValue(f) {
+    return {
+      enabled: Boolean(formValue(f, 'bannerEnabled')),
+      backgroundUrl: formValue(f, 'bannerUrl').trim() || null,
+      title: formValue(f, 'bannerTitle').trim() || null,
+      subtitle: formValue(f, 'bannerSubtitle').trim() || null,
+      accentColor: formValue(f, 'bannerAccent') || null,
+      nameColor: formValue(f, 'bannerName') || null,
+      overlay: Number(formValue(f, 'bannerOverlay') ?? 0.32),
+    };
+  }
   inputs.msg = (f) => updateMsgPreview(f);
   actions['insert-var'] = (btn) => {
     const ta = btn.closest('form').elements.message;
@@ -1805,6 +1838,97 @@
     ta.focus();
     ta.dispatchEvent(new Event('input', { bubbles: true }));
   };
+  actions['banner-remove'] = (btn) => {
+    const f = btn.closest('form');
+    const hidden = f?.querySelector('input[name="bannerUrl"]');
+    if (hidden) hidden.value = '';
+    const external = f?.querySelector('[data-banner-external]');
+    if (external) external.value = '';
+    const img = f?.querySelector('[data-banner-preview]');
+    if (img) {
+      if (img.dataset.blob) URL.revokeObjectURL(img.dataset.blob);
+      img.removeAttribute('src');
+      img.dataset.blob = '';
+      img.hidden = true;
+    }
+    const empty = f?.querySelector('[data-banner-empty]');
+    if (empty) empty.hidden = false;
+    toast('info', 'Slika je uklonjena', 'Spremi promjene da ju ukloniš i iz postavki.');
+  };
+  async function uploadBanner(input) {
+    const file = input.files?.[0];
+    const form = input.closest('form');
+    if (!file || !form) return;
+    if (file.size > 8 * 1024 * 1024) {
+      toast('error', 'Slika je prevelika', 'Najveća dopuštena veličina je 8 MB.');
+      input.value = '';
+      return;
+    }
+    const { g } = state.page;
+    try {
+      const res = await fetch(g$(g.id, `/banner-upload?kind=${encodeURIComponent(form.dataset.kind)}`), {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-Dashboard': '1', 'Content-Type': file.type || 'application/octet-stream' },
+        body: file,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Upload nije uspio.');
+      const hidden = form.querySelector('input[name="bannerUrl"]');
+      if (hidden) hidden.value = data.url;
+      const external = form.querySelector('[data-banner-external]');
+      if (external) external.value = '';
+      const img = form.querySelector('[data-banner-preview]');
+      if (img) {
+        if (img.dataset.blob) URL.revokeObjectURL(img.dataset.blob);
+        img.dataset.blob = '';
+        img.src = data.url;
+        img.hidden = false;
+      }
+      const empty = form.querySelector('[data-banner-empty]');
+      if (empty) empty.hidden = true;
+      toast('success', 'Slika je učitana', 'Klikni Spremi promjene da ju sačuvaš.');
+    } catch (err) {
+      reportError(err, 'Upload nije uspio');
+    } finally {
+      input.value = '';
+    }
+  }
+  actions['banner-preview'] = async (btn) => {
+    const f = btn.closest('form');
+    if (!f) return;
+    const banner = bannerFormValue(f);
+    if (!banner.backgroundUrl) {
+      toast('info', 'Nema pozadine', 'Učitaj sliku ili zalijepi URL prije pregleda.');
+      return;
+    }
+    const { g } = state.page;
+    try {
+      const res = await fetch(g$(g.id, '/banner-preview'), {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Dashboard': '1' },
+        body: JSON.stringify({ kind: f.dataset.kind, banner }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Pregled nije uspio.');
+      }
+      const blob = await res.blob();
+      const img = f.querySelector('[data-banner-preview]');
+      if (img) {
+        if (img.dataset.blob) URL.revokeObjectURL(img.dataset.blob);
+        const url = URL.createObjectURL(blob);
+        img.dataset.blob = url;
+        img.src = url;
+        img.hidden = false;
+      }
+      const empty = f.querySelector('[data-banner-empty]');
+      if (empty) empty.hidden = true;
+    } catch (err) {
+      reportError(err, 'Pregled nije uspio');
+    }
+  };
   forms.msg = async (f, btn) => {
     clearErrors(f);
     const kind = f.dataset.kind;
@@ -1812,15 +1936,10 @@
     if (imageUrl && !safeUrl(imageUrl)) return fieldError(f, 'imageUrl', 'Upiši ispravan URL slike (http ili https).');
     const body = { enabled: formValue(f, 'enabled'), channelId: formValue(f, 'channelId') || null, message: formValue(f, 'message').trim(), imageUrl: imageUrl || null };
     if (kind === 'welcome' || kind === 'goodbye') {
-      body.banner = {
-        enabled: Boolean(formValue(f, 'bannerEnabled')),
-        backgroundUrl: formValue(f, 'bannerUrl').trim() || null,
-        title: formValue(f, 'bannerTitle').trim() || null,
-        subtitle: formValue(f, 'bannerSubtitle').trim() || null,
-        accentColor: formValue(f, 'bannerAccent') || null,
-        nameColor: formValue(f, 'bannerName') || null,
-      };
-      if (body.banner.enabled && !body.banner.backgroundUrl) return fieldError(f, 'bannerUrl', 'Upiši URL pozadinske slike za banner.');
+      body.banner = bannerFormValue(f);
+      if (body.banner.enabled && !body.banner.backgroundUrl) {
+        return toast('info', 'Nema pozadine bannera', 'Učitaj sliku ili zalijepi URL, pa spremi promjene.');
+      }
     }
     if (body.enabled && !body.channelId) return fieldError(f, 'channelId', 'Odaberi kanal u koji bot šalje poruku.');
     const { g } = state.page;
@@ -4193,6 +4312,117 @@
     });
   };
 
+  // ---------- Free games ----------
+  async function pageFreeGames(ctx) {
+    ctx.head = pageHead('Besplatne igre', 'Obavijesti kad Epic Games ili Steam podijele besplatnu igru.');
+    mount(ctx.el, html`${ctx.head}<div class="cols cols-form-right"><div class="stack">${skelCard(420)}${skelCard(320)}</div><div class="stack">${skelCard(280)}</div></div>`);
+    const res = await ctx.load(() => Promise.all([guildData(ctx.gid), api('GET', g$(ctx.gid, '/freegames'))]));
+    if (!res) return;
+    const [g, fg] = res;
+    Object.assign(state.page, { g, ctx, fg });
+    drawFreeGames();
+  }
+  function freeGameList(list, platform) {
+    if (!list || !list.length) return emptyState('ti-gift', `Trenutno nema besplatnih igara na ${platform}.`);
+    return html`<ul class="plain-list">${list.map((game) => html`<li>
+      <span class="avatar avatar-sm" aria-hidden="true">${icon(platform === 'Epic Games' ? 'ti-gift' : 'ti-brand-steam')}</span>
+      <span class="row-main">
+        <a class="row-title" style="display:block" href="${safeUrl(game.url) || '#'}" target="_blank" rel="noopener noreferrer">${game.title}${extArrow}</a>
+        <span class="row-meta">${game.endText ? html`do ${raw(game.endText)}` : 'bez datuma zavrsetka'}${game.worth ? html`<span class="sep">·</span>vrijednost ${game.worth}` : ''}</span>
+      </span>
+    </li>`)}</ul>`;
+  }
+  function drawFreeGames() {
+    const { g, ctx, fg } = state.page;
+    const c = fg.config;
+    const id = { ch: uid('f'), role: uid('f'), msg: uid('f') };
+    const games = fg.cached;
+    mount(ctx.el, html`${ctx.head}
+      <div class="cols cols-form-right">
+        <div class="stack">
+          <section class="card" aria-labelledby="fg-h">
+            <div class="card-head"><div><h2 class="card-title" id="fg-h">Postavke obavijesti</h2>
+              <p class="card-desc">Bot provjerava svakih ${fmtNum(fg.pollHours || 6)} h. Prva provjera samo zapamti trenutno stanje.</p></div>
+              ${statusBadge(c.enabled)}</div>
+            <form class="form" data-form="freegames" novalidate>
+              <div class="fields">
+                <label class="toggle"><input type="checkbox" role="switch" name="enabled" ${c.enabled ? raw('checked') : ''}><span class="track" aria-hidden="true"></span><span>Salji obavijesti o besplatnim igrama</span></label>
+                <label class="toggle"><input type="checkbox" role="switch" name="epic" ${c.epic ? raw('checked') : ''}><span class="track" aria-hidden="true"></span><span>Epic Games</span></label>
+                <label class="toggle"><input type="checkbox" role="switch" name="steam" ${c.steam ? raw('checked') : ''}><span class="track" aria-hidden="true"></span><span>Steam</span></label>
+                ${field({ name: 'channelId', label: 'Kanal', id: id.ch, required: true,
+                  control: selectField({ id: id.ch, name: 'channelId', options: textChannelOptions(g), value: c.channelId || '', placeholder: 'Odaberi kanal', emptyText: 'Server nema tekstualnih kanala.' }) })}
+                ${field({ name: 'roleId', label: 'Rola za spominjanje', id: id.role,
+                  help: 'Neobavezno. Rola se spominje uz svaku obavijest.',
+                  control: selectField({ id: id.role, name: 'roleId', options: [{ value: '', label: 'Bez role' }, ...roleOptions(g)], value: c.roleId || '', placeholder: 'Bez role' }) })}
+                <div class="field">
+                  <label class="label" for="${id.msg}">Uvodna poruka</label>
+                  <textarea class="input" id="${id.msg}" name="message" rows="3" maxlength="2000" placeholder="npr. Nove besplatne igre ovaj tjedan!">${c.message || ''}</textarea>
+                  <p class="help">Neobavezno. Ide iznad popisa igara.</p>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Spremi promjene</button>
+                <button type="button" class="btn" data-action="freegames-check">Provjeri sada</button>
+                <button type="button" class="btn" data-action="freegames-test">Posalji test</button>
+              </div>
+            </form>
+          </section>
+          <section class="card" aria-labelledby="fg-l-h">
+            <div class="card-head"><div><h2 class="card-title" id="fg-l-h">Trenutno besplatno</h2>
+              <p class="card-desc">${games?.fetchedAt ? html`Osvjezeno ${timeEl(games.fetchedAt)}` : 'Podaci jos nisu dohvaceni.'}</p></div>
+              <div class="card-actions"><button type="button" class="btn-icon" data-action="freegames-check" aria-label="Osvjezi besplatne igre" data-tip="Osvjezi">${icon('ti-refresh')}</button></div></div>
+            ${games ? html`<div class="stack">
+              ${c.epic ? html`<div><h3 class="sub-title">Epic Games</h3>${freeGameList(games.epic, 'Epic Games')}</div>` : ''}
+              ${c.steam ? html`<div><h3 class="sub-title section-gap">Steam</h3>${freeGameList(games.steam, 'Steam')}</div>` : ''}
+              ${games.errors?.length ? html`<aside class="callout callout-warning">${icon('ti-alert-triangle')}<div><p class="callout-title">Neke platforme nisu dostupne</p><p class="callout-body">${games.errors.join(' · ')}</p></div></aside>` : ''}
+            </div>` : emptyState('ti-gift', 'Klikni Provjeri sada da dohvatiš trenutne besplatne igre.')}
+          </section>
+        </div>
+        <aside class="stack">
+          <aside class="callout callout-info">${icon('ti-info-circle')}
+            <div><p class="callout-title">Kako radi</p><p class="callout-body">Epic se cita s javnog store endpointa, a Steam preko GamerPower feeda. Bot salje samo nove igre, jednom po igri. Prva provjera ne salje nista.</p></div>
+          </aside>
+          <aside class="callout callout-warning">${icon('ti-alert-triangle')}
+            <div><p class="callout-title">Napomena</p><p class="callout-body">Besplatne igre se mijenjaju tjedno. Ako se popis ne osvjezi, provjeri je li racunalo dopusteno na mrezi i pokusaj ponovno za nekoliko minuta.</p></div>
+          </aside>
+        </aside>
+      </div>`);
+  }
+  forms.freegames = async (f, btn) => {
+    clearErrors(f);
+    const { g } = state.page;
+    const body = {
+      enabled: Boolean(formValue(f, 'enabled')),
+      epic: Boolean(formValue(f, 'epic')),
+      steam: Boolean(formValue(f, 'steam')),
+      channelId: formValue(f, 'channelId') || null,
+      roleId: formValue(f, 'roleId') || null,
+      message: formValue(f, 'message').trim(),
+    };
+    if (body.enabled && !body.channelId) return fieldError(f, 'channelId', 'Odaberi kanal za obavijesti.');
+    if (!body.epic && !body.steam) return toast('info', 'Odaberi platformu', 'Ukljuci barem Epic ili Steam.');
+    let res;
+    const done = await run(btn, async () => { res = await api('PUT', g$(g.id, '/freegames'), body); }, 'Spremanje nije uspjelo');
+    if (!done) return;
+    state.page.fg = res;
+    invalidateGuild(g.id);
+    drawFreeGames();
+    toast('success', 'Obavijesti su spremljene', body.enabled ? 'Bot ce javljati o novim besplatnim igrama.' : 'Obavijesti su iskljucene.');
+  };
+  actions['freegames-check'] = (btn) => run(btn, async () => {
+    const { g } = state.page;
+    state.page.fg = await api('POST', g$(g.id, '/freegames/check'), { notify: true });
+    invalidateGuild(g.id);
+    drawFreeGames();
+    toast('success', 'Provjera je gotova', 'Popis besplatnih igara je osvjezen.');
+  }, 'Provjera nije uspjela');
+  actions['freegames-test'] = (btn) => run(btn, async () => {
+    const { g } = state.page;
+    state.page.fg = await api('POST', g$(g.id, '/freegames/test'));
+    drawFreeGames();
+    toast('success', 'Testna obavijest je poslana');
+  }, 'Test nije poslan');
+
   // ---------- Appearance (accent picker) ----------
   actions.appearance = () => {
     closeDrawer(false);
@@ -4462,6 +4692,7 @@
     birthdays: pageBirthdays,
     messages: pageMessages,
     social: pageSocial,
+    freegames: pageFreeGames,
   };
 
   /* =====================================================================
@@ -4473,6 +4704,16 @@
     initSelects();
     initMenus();
     initDelegation();
+    document.addEventListener('change', (e) => {
+      const input = e.target.closest && e.target.closest('[data-banner-file]');
+      if (input) uploadBanner(input);
+    });
+    document.addEventListener('input', (e) => {
+      const external = e.target.closest && e.target.closest('[data-banner-external]');
+      if (!external) return;
+      const hidden = external.closest('form')?.querySelector('input[name="bannerUrl"]');
+      if (hidden) hidden.value = external.value.trim();
+    });
     // Broken avatar images fall back to initials.
     document.addEventListener('error', (e) => {
       const img = e.target;

@@ -48,6 +48,9 @@ function rgba(hexColor, alpha) {
 function safeUrl(value) {
   const raw = String(value ?? '').trim();
   if (!raw) return '';
+  if (/^data:image\/(?:png|jpe?g|webp);base64,[a-z0-9+/=]+$/i.test(raw)) {
+    return raw.length <= 4_000_000 ? raw : '';
+  }
   try {
     const url = new URL(raw);
     return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : '';
@@ -71,6 +74,11 @@ export function normalizeBanner(raw, defaults = {}) {
 }
 
 async function fetchImage(url) {
+  if (String(url).startsWith('data:')) {
+    const comma = String(url).indexOf(',');
+    if (comma < 0) throw new Error('Neispravna data URL.');
+    return Buffer.from(String(url).slice(comma + 1), 'base64');
+  }
   const res = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(20_000) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const type = String(res.headers.get('content-type') || '');
@@ -78,7 +86,21 @@ async function fetchImage(url) {
   return Buffer.from(await res.arrayBuffer());
 }
 
+// Uploads are cropped to the banner size and stored as a compact JPEG data URL,
+// so the image lives in the bot database and works behind the BYOT proxy too.
+export async function processBannerImage(buffer) {
+  const image = await loadImage(buffer);
+  const canvas = createCanvas(WIDTH, HEIGHT);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#1c1e23';
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  drawCover(ctx, image);
+  const jpeg = canvas.toBuffer('image/jpeg', 85);
+  return `data:image/jpeg;base64,${jpeg.toString('base64')}`;
+}
+
 async function backgroundImage(url) {
+  if (String(url).startsWith('data:')) return loadImage(await fetchImage(url));
   const hit = backgroundCache.get(url);
   if (hit && Date.now() - hit.at < 10 * 60 * 1000) return hit.image;
   const image = await loadImage(await fetchImage(url));

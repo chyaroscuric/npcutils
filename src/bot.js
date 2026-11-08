@@ -10,6 +10,7 @@ import * as antilink from './features/antilink.js';
 import * as birthdays from './features/birthdays.js';
 import * as botSettings from './features/botSettings.js';
 import * as counting from './features/counting.js';
+import * as freeGames from './features/freeGames.js';
 import * as levels from './features/levels.js';
 import * as games from './features/games/index.js';
 import * as fishing from './features/games/fishing.js';
@@ -95,6 +96,7 @@ client.once(Events.ClientReady, async () => {
   levels.start(client);
   birthdays.start(client);
   socialAlerts.start(client);
+  freeGames.start(client);
   music.checkSetup();
   games.startGames();
 
@@ -237,6 +239,7 @@ function shutdown(code = 0) {
     levels.stop();
     birthdays.stop();
     socialAlerts.stop();
+    freeGames.stop();
     db.flush();
   } catch (err) {
     console.error('[db]', err);

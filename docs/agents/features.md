@@ -31,8 +31,12 @@ Uses `@napi-rs/canvas` to draw a 1024×512 PNG:
 - white rounded name pill with configurable text colour.
 
 `normalizeBanner()` validates URLs and hex colours. Backgrounds are cached in memory for
-10 minutes. If the background or avatar fetch fails, the renderer uses a flat fallback;
-`buildWelcomePayload()` still falls back to the normal embed if the whole render fails.
+10 minutes. Uploaded images are accepted as raw PNG/JPG/WebP/GIF (max 8 MB), cropped to
+1024×512 and stored as a JPEG data URL in the guild config, so they work behind the BYOT
+proxy without a public file server. `POST /guilds/:gid/banner-preview` renders a live
+preview for the dashboard designer. If the background or avatar fetch fails, the renderer
+uses a flat fallback; `buildWelcomePayload()` still falls back to the normal embed if the
+whole render fails.
 
 ### `stats.js` + `socialStats.js`
 
@@ -67,6 +71,23 @@ Polls public pages and sends an embed when a tracked account changes state.
   `targetChannel()` falls back to the main `channelId`.
 - `checkGuild(guild, { notify, accountId })` is used by the poller and dashboard.
 - `start(client)` polls every `SOCIAL_POLL_MINUTES` (default 5, minimum 2).
+
+### `freeGames.js`
+
+Polls Epic Games and Steam for free game giveaways and notifies each guild once per
+game.
+
+- Epic: `freeGamesPromotions` public endpoint; keeps active promotions where the
+  discounted price is 0 and the original price is greater than 0 (excludes permanently
+  free-to-play titles).
+- Steam: GamerPower `giveaways?platform=steam`; keeps `Active` items of type `Game` or
+  `Early Access` (excludes DLC/playtests).
+- Results are cached for 30 minutes. `newSince()` compares IDs against
+  `config.freeGames.lastEpic` / `lastSteam`.
+- The first check only records a baseline. Later checks send only new games.
+- `buildFreeGamesPayload()` renders Epic/Steam fields with links, values and end dates.
+- Poll interval: `FREE_GAMES_POLL_HOURS` (default 6, minimum 1).
+- Dashboard page: **Besplatne igre**; command: `/freegames`.
 
 ### `tickets.js`
 

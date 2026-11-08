@@ -25,6 +25,7 @@ export async function execute(interaction) {
       { name: '🎮 Igre', value: '`/zastava` • `/wordle` • `/kaladont start|stop` • `/toplohladno start|stop` • `/mafia start|stop|stats` • `/fish` • `/ship` • `/counting setup|status|reset|off`' },
       { name: '📈 Leveli', value: '`/rank` • `/top` • `/levels status|ukljuci|postavke|reset`' },
       { name: '📨 Poruke i embedi', value: '`/posalji` — pošalji poruku ili embed kao bot' },
+      { name: '🎁 Besplatne igre', value: '`/freegames` — trenutno besplatne igre na Epicu i Steamu' },
       {
         name: '🔨 Moderacija',
         value: '`/purge` • `/ban` • `/unban` • `/kick` • `/timeout` • `/untimeout` • `/warn` • `/warnings` • `/clearwarns` • `/slowmode` • `/lock` • `/unlock` • `/modlog`',

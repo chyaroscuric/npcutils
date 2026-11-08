@@ -18,6 +18,7 @@ Custom Discord bot napravljen u [discord.js](https://discord.js.org) v14.
 | 🎵 **Glazba** | `/play` s YouTubea, SoundClouda, playliste ili pretrage; red, loop, shuffle, gumbi za kontrolu |
 | 🎮 **Igre** | Pogodi državu (zastave), Wordle, Kaladont, Toplo-hladno, Mafija, Pecanje, Ship |
 | 🔔 **Obavijesti s mreža** | Javi kad YouTube/TikTok objavi video ili Twitch/YouTube/TikTok počne stream |
+| 🎁 **Besplatne igre** | Javi kad Epic Games ili Steam podijele besplatnu igru |
 | 🖼️ **Welcome banner** | Automatski banner s pozadinom, avatarom i imenom novog člana |
 | 🚪 **Goodbye poruka** | Poruka kad član napusti server, s kanalom i tekstom po želji |
 | ✉️ **Poruke i embedi** | Pošalji običnu poruku ili embed kao bot, s dashboarda ili `/posalji` |
@@ -120,7 +121,7 @@ pm2 start ecosystem.config.cjs && pm2 save && pm2 startup
 
 ## 🌐 Dashboard
 
-Dashboard je web stranica na kojoj se prijaviš Discordom i podesiš sve bez komandi: welcome i boost poruke (s automatskim bannerom), autorole, stats kanale, tikete (i zatvaranje otvorenih), invite-ove (bonus, reset), reaction role, giveawaye, glazbu (dodavanje pjesama, pauza, skip, red), rođendane, obavijesti s mreža i poruke/embede.
+Dashboard je web stranica na kojoj se prijaviš Discordom i podesiš sve bez komandi: welcome i boost poruke (s automatskim bannerom), autorole, stats kanale, tikete (i zatvaranje otvorenih), invite-ove (bonus, reset), reaction role, giveawaye, glazbu (dodavanje pjesama, pauza, skip, red), rođendane, obavijesti s mreža, besplatne igre i poruke/embede.
 
 1. U `.env` postavi `PORT` (npr. `3000`), `CLIENT_SECRET` (Developer Portal → OAuth2) i `DASHBOARD_URL` (adresa na kojoj se otvara, npr. `http://localhost:3000`).
 2. U Developer Portalu → OAuth2 → Redirects dodaj `DASHBOARD_URL` + `/callback`.
@@ -195,9 +196,21 @@ Dashboard → **Obavijesti** prati javne YouTube, Twitch i TikTok račune i šal
 
 Prva provjera samo zapamti stanje, a svaka sljedeća promjena šalje obavijest. Možeš odabrati glavni kanal, role koja se spominje, tekst poruke i pojedinačno uključiti **Video** i **Uživo** za svaki račun. Za svaku platformu i vrstu (npr. YouTube video, YouTube live, Twitch live, TikTok video, TikTok live) možeš odabrati i poseban kanal; ako ostaviš prazno, koristi se glavni kanal. Provjera ide svakih 5 minuta (`SOCIAL_POLL_MINUTES`). TikTok i YouTube link ponekad vode na profil jer javna stranica ne daje direktan link na video bez API-ja.
 
+## 🎁 Besplatne igre
+
+Dashboard → **Besplatne igre** prati Epic Games i Steam. Kad se pojavi nova besplatna igra, bot pošalje embed s linkom, vrijednošću i datumom završetka. Možeš uključiti samo Epic, samo Steam ili oboje, odabrati kanal, rolu i uvodnu poruku.
+
+- Epic se čita s javnog store endpointa.
+- Steam se čita preko GamerPower feeda i uzima aktivne **Game** i **Early Access** ponude.
+- Prva provjera samo zapamti trenutno stanje; obavijest ide za svaku novu igru.
+- Provjera ide svakih 6 sati (`FREE_GAMES_POLL_HOURS`).
+- `/freegames` prikaže trenutni popis bez čekanja na obavijest.
+
 ## 🖼️ Welcome banner
 
-Uz običnu welcome poruku bot može nacrtati banner: pozadinska slika, avatar novog člana u krugu i njegovo ime u traci. Postavi ga na dashboardu pod **Dobrodošlica i role** (URL pozadine, tekst, boje) ili naredbom:
+Uz običnu welcome poruku bot može nacrtati banner: pozadinska slika, avatar novog člana u krugu i njegovo ime u traci. Na dashboardu pod **Dobrodošlica i role** otvori **Dizajner bannera**: učitaj sliku s računala (PNG, JPG, WebP ili GIF do 8 MB), ili zalijepi URL, pa klikni **Osvježi pregled bannera**. Bot sliku automatski obreže na 1024×512 i spremi ju u bazu, pa radi i kad je dashboard iza BYOT proxyja.
+
+Isto možeš postaviti naredbom:
 
 ```
 /welcome set kanal:#dobrodošli banner:https://example.com/pozadina.png banner_tekst:Dobrodošao/la kod {server}
