@@ -1687,7 +1687,10 @@
     const desc = isW ? 'Bot je šalje kad netko uđe na server.' : isG ? 'Bot je šalje kad netko napusti server.' : 'Bot je šalje kad netko boosta server.';
     const toggleLabel = isW ? 'Šalji poruku dobrodošlice' : isG ? 'Šalji poruku odlaska' : 'Šalji poruku za boost';
     const id = { ch: uid('f'), msg: uid('f'), img: uid('f'), banner: uid('f'), btitle: uid('f'), bsub: uid('f'), bacc: uid('f'), bname: uid('f') };
-    const banner = isW ? (c.banner || {}) : {};
+    const showBanner = isW || isG;
+    const banner = showBanner ? (c.banner || {}) : {};
+    const bannerTitleDefault = isG ? 'Dovidenja od {server}' : 'Dobrodošao/la kod {server}';
+    const bannerSubtitleDefault = isG ? 'Ostalo nas je {memberCount}.' : 'Novi član · {memberCount}.';
     return html`<div class="cols cols-form-right">
       <section class="card" aria-labelledby="msg-h">
         <div class="card-head"><div><h2 class="card-title" id="msg-h">${title}</h2>
@@ -1705,17 +1708,17 @@
             </div>
             ${field({ name: 'imageUrl', label: 'Slika (URL)', id: id.img, help: 'Zalijepi link na sliku (PNG, JPG, GIF ili WebP). Ostavi prazno ako ne želiš sliku.',
               control: html`<input class="input" id="${id.img}" name="imageUrl" type="url" maxlength="2048" value="${c.imageUrl || ''}" placeholder="https://example.com/slika.png" aria-describedby="${id.img}-help">` })}
-            ${isW ? html`
+            ${showBanner ? html`
               <div class="section-gap">
                 <label class="toggle"><input type="checkbox" role="switch" name="bannerEnabled" ${banner.enabled ? raw('checked') : ''}><span class="track" aria-hidden="true"></span><span>Automatski banner s avatarom i imenom</span></label>
-                <p class="help">Bot nacrta pozadinsku sliku, stavi avatar novog clana u krug i njegovo ime u bijelu traku. Ako slika ne radi, salje se obicna poruka.</p>
+                <p class="help">Bot nacrta pozadinsku sliku, stavi avatar ${isG ? 'clana koji odlazi' : 'novog clana'} u krug i njegovo ime u bijelu traku. Ako slika ne radi, salje se obicna poruka.</p>
               </div>
               ${field({ name: 'bannerUrl', label: 'Pozadina bannera (URL)', id: id.banner, help: 'Preporuka: siroka slika barem 1024×512 px (PNG ili JPG).',
                 control: html`<input class="input" id="${id.banner}" name="bannerUrl" type="url" maxlength="2048" value="${banner.backgroundUrl || ''}" placeholder="https://example.com/pozadina.png" aria-describedby="${id.banner}-help">` })}
               ${field({ name: 'bannerTitle', label: 'Tekst na banneru', id: id.btitle, help: 'Varijable: {server}, {username}, {memberCount}.',
-                control: html`<input class="input" id="${id.btitle}" name="bannerTitle" maxlength="160" value="${banner.title || 'Dobrodošao/la kod {server}'}" aria-describedby="${id.btitle}-help">` })}
+                control: html`<input class="input" id="${id.btitle}" name="bannerTitle" maxlength="160" value="${banner.title || bannerTitleDefault}" aria-describedby="${id.btitle}-help">` })}
               ${field({ name: 'bannerSubtitle', label: 'Manji tekst ispod', id: id.bsub, help: 'Ostavi prazno ako ne zelis drugi red.',
-                control: html`<input class="input" id="${id.bsub}" name="bannerSubtitle" maxlength="160" value="${banner.subtitle || ''}" aria-describedby="${id.bsub}-help">` })}
+                control: html`<input class="input" id="${id.bsub}" name="bannerSubtitle" maxlength="160" value="${banner.subtitle || bannerSubtitleDefault}" aria-describedby="${id.bsub}-help">` })}
               <div class="field-row">
                 ${field({ name: 'bannerAccent', label: 'Boja okvira avatara', id: id.bacc,
                   control: html`<input class="input" id="${id.bacc}" name="bannerAccent" type="color" value="${banner.accentColor || '#f472b6'}">` })}
@@ -1808,7 +1811,7 @@
     const imageUrl = formValue(f, 'imageUrl').trim();
     if (imageUrl && !safeUrl(imageUrl)) return fieldError(f, 'imageUrl', 'Upiši ispravan URL slike (http ili https).');
     const body = { enabled: formValue(f, 'enabled'), channelId: formValue(f, 'channelId') || null, message: formValue(f, 'message').trim(), imageUrl: imageUrl || null };
-    if (kind === 'welcome') {
+    if (kind === 'welcome' || kind === 'goodbye') {
       body.banner = {
         enabled: Boolean(formValue(f, 'bannerEnabled')),
         backgroundUrl: formValue(f, 'bannerUrl').trim() || null,
@@ -3814,17 +3817,17 @@
     state.page.msgFields = [{ name: '', value: '', inline: false }];
     drawMessages();
   }
-  function msgFieldRow(field, index) {
+  function msgFieldRow(item, index) {
     return html`<div class="msg-field" data-msg-field data-index="${index}">
       <div class="field-row">
         ${field({ name: `fieldName${index}`, label: 'Naziv polja', id: uid('f'),
-          control: html`<input class="input" data-msg-name maxlength="256" value="${field.name || ''}" placeholder="npr. Pravila">` })}
+          control: html`<input class="input" data-msg-name maxlength="256" value="${item.name || ''}" placeholder="npr. Pravila">` })}
         ${field({ name: `fieldInline${index}`, label: 'Prikaz', id: uid('f'),
-          control: html`<label class="toggle"><input type="checkbox" data-msg-inline ${field.inline ? raw('checked') : ''}><span class="track" aria-hidden="true"></span><span>U istom redu</span></label>` })}
+          control: html`<label class="toggle"><input type="checkbox" data-msg-inline ${item.inline ? raw('checked') : ''}><span class="track" aria-hidden="true"></span><span>U istom redu</span></label>` })}
       </div>
       <div class="field-row">
         ${field({ name: `fieldValue${index}`, label: 'Vrijednost', id: uid('f'),
-          control: html`<input class="input" data-msg-value maxlength="1024" value="${field.value || ''}" placeholder="npr. Budi pristojan i ne spamaj.">` })}
+          control: html`<input class="input" data-msg-value maxlength="1024" value="${item.value || ''}" placeholder="npr. Budi pristojan i ne spamaj.">` })}
         <div class="field"><span class="label">&nbsp;</span><button type="button" class="btn" data-action="msg-field-remove" data-index="${index}">${icon('ti-trash')}Ukloni</button></div>
       </div>
     </div>`;
@@ -4022,10 +4025,13 @@
   function drawSocial() {
     const { g, ctx, s } = state.page;
     const c = s.config;
-    const id = { ch: uid('f'), role: uid('f'), msg: uid('f'), platform: uid('f'), account: uid('f') };
+    const id = { ch: uid('f'), role: uid('f'), msg: uid('f'), platform: uid('f'), account: uid('f'), routes: {} };
+    const routes = s.routes || [];
+    for (const route of routes) id.routes[route.key] = uid('f');
     const platforms = (s.platforms || []).map((p) => ({ value: p.key, label: p.label, lead: icon(PLATFORM_ICONS[p.key] || 'ti-world', 'ti-sm opt-lead') }));
+    const anyRoute = routes.some((route) => route.channelId);
     mount(ctx.el, html`${ctx.head}
-      ${c.enabled && !s.channel ? html`<aside class="callout callout-warning section-gap">${icon('ti-alert-triangle')}<div><p class="callout-title">Kanal nije dostupan</p><p class="callout-body">Obavijesti su ukljucene, ali odabrani kanal vise ne postoji ili bot do njega nema pristup. Odaberi drugi kanal i spremi promjene.</p></div></aside>` : ''}
+      ${c.enabled && !s.channel && !anyRoute ? html`<aside class="callout callout-warning section-gap">${icon('ti-alert-triangle')}<div><p class="callout-title">Kanal nije dostupan</p><p class="callout-body">Obavijesti su ukljucene, ali nijedan odabrani kanal vise ne postoji ili bot do njega nema pristup. Odaberi kanal i spremi promjene.</p></div></aside>` : ''}
       <div class="cols cols-form-right">
         <div class="stack">
           <section class="card" aria-labelledby="so-h">
@@ -4035,8 +4041,9 @@
             <form class="form" data-form="social" novalidate>
               <div class="fields">
                 <label class="toggle"><input type="checkbox" role="switch" name="enabled" ${c.enabled ? raw('checked') : ''}><span class="track" aria-hidden="true"></span><span>Salji obavijesti</span></label>
-                ${field({ name: 'channelId', label: 'Kanal', id: id.ch, required: true,
-                  control: selectField({ id: id.ch, name: 'channelId', options: textChannelOptions(g), value: c.channelId || '', placeholder: 'Odaberi kanal', emptyText: 'Server nema tekstualnih kanala.' }) })}
+                ${field({ name: 'channelId', label: 'Glavni kanal', id: id.ch,
+                  help: 'Koristi se kad za pojedinu vrstu nije odabran poseban kanal.',
+                  control: selectField({ id: id.ch, name: 'channelId', options: textChannelOptions(g), value: c.channelId || '', placeholder: 'Koristi posebne kanale ispod', emptyText: 'Server nema tekstualnih kanala.' }) })}
                 ${field({ name: 'roleId', label: 'Rola za spominjanje', id: id.role,
                   help: 'Neobavezno. Rola se spominje uz svaku obavijest.',
                   control: selectField({ id: id.role, name: 'roleId', options: [{ value: '', label: 'Bez role' }, ...roleOptions(g)], value: c.roleId || '', placeholder: 'Bez role' }) })}
@@ -4044,6 +4051,22 @@
                   <label class="label" for="${id.msg}">Poruka</label>
                   <textarea class="input" id="${id.msg}" name="message" rows="4" maxlength="2000" placeholder="${s.defaultMessage}" aria-describedby="${id.msg}-help">${c.message || ''}</textarea>
                   <p class="help" id="${id.msg}-help">Varijable: {account}, {username}, {platform}, {event}, {title}, {url}, {game}, {followers}. Ostavi prazno za zadanu poruku.</p>
+                </div>
+                <div class="section-gap">
+                  <h3 class="sub-title">Kanali po platformi i vrsti</h3>
+                  <p class="help">Ako ostavis prazno, koristi se glavni kanal. Tako YouTube videi, YouTube live, Twitch live, TikTok videi i TikTok live mogu ici u razlicite kanale.</p>
+                  ${routes.map((route) => field({
+                    name: `route_${route.key.replace(':', '_')}`,
+                    label: `${route.platformLabel} — ${route.eventLabel}`,
+                    id: id.routes[route.key],
+                    control: selectField({
+                      id: id.routes[route.key],
+                      name: `route_${route.key.replace(':', '_')}`,
+                      options: [{ value: '', label: 'Koristi glavni kanal', group: '' }, ...textChannelOptions(g)],
+                      value: route.channelId || '',
+                      placeholder: 'Koristi glavni kanal',
+                    }),
+                  }))}
                 </div>
               </div>
               <div class="form-actions">
@@ -4085,21 +4108,29 @@
   }
   forms.social = async (f, btn) => {
     clearErrors(f);
-    const { g } = state.page;
+    const { g, s } = state.page;
+    const channels = {};
+    for (const route of s.routes || []) {
+      const value = formValue(f, `route_${route.key.replace(':', '_')}`);
+      channels[route.key] = value || null;
+    }
     const body = {
       enabled: Boolean(formValue(f, 'enabled')),
       channelId: formValue(f, 'channelId') || null,
       roleId: formValue(f, 'roleId') || null,
       message: formValue(f, 'message').trim(),
+      channels,
     };
-    if (body.enabled && !body.channelId) return fieldError(f, 'channelId', 'Odaberi kanal za obavijesti.');
+    if (body.enabled && !body.channelId && !Object.keys(channels).length) {
+      return fieldError(f, 'channelId', 'Odaberi glavni kanal ili barem jedan kanal po vrsti obavijesti.');
+    }
     let res;
     const done = await run(btn, async () => { res = await api('PUT', g$(g.id, '/social'), body); }, 'Spremanje nije uspjelo');
     if (!done) return;
     state.page.s = res;
     invalidateGuild(g.id);
     drawSocial();
-    toast('success', 'Obavijesti su spremljene', body.enabled ? 'Bot ce javljati u odabrani kanal.' : 'Obavijesti su iskljucene.');
+    toast('success', 'Obavijesti su spremljene', body.enabled ? 'Bot ce javljati u odabrane kanale.' : 'Obavijesti su iskljucene.');
   };
   forms['social-account'] = async (f, btn) => {
     clearErrors(f);

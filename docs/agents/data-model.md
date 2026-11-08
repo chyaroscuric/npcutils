@@ -70,7 +70,7 @@ normalizer.
 | `config.birthdays` | `features/birthdays.js` | `{ enabled, channelId, roleId, hour, message, timezone }` |
 | `birthdays` | `features/birthdays.js` | userId -> `{ day, month, year, setAt, lastCelebrated }` |
 | `birthdayRoles` | `features/birthdays.js` | userId -> `{ year, roleId }` (active birthday role) |
-| `config.socialAlerts` | `features/socialAlerts.js` | `{ enabled, channelId, roleId, message, accounts: [...] }` |
+| `config.socialAlerts` | `features/socialAlerts.js` | `{ enabled, channelId, roleId, message, channels, accounts: [...] }`; `channels` maps `platform:event` to a channel ID override |
 
 ### Social alert account shape
 

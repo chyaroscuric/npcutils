@@ -9,7 +9,7 @@ import * as db from '../db.js';
 import { recentActivity } from '../features/activity.js';
 import * as giveaways from '../features/giveaways.js';
 import * as invites from '../features/invites.js';
-import { DEFAULT_BOOST, DEFAULT_GOODBYE, DEFAULT_WELCOME, boostPayload, buildWelcomePayload, goodbyePayload } from '../features/members.js';
+import { DEFAULT_BOOST, DEFAULT_GOODBYE, DEFAULT_WELCOME, GOODBYE_BANNER, boostPayload, buildGoodbyePayload, buildWelcomePayload } from '../features/members.js';
 import { normalizeBanner } from '../features/welcomeBanner.js';
 import * as music from '../features/music.js';
 import * as antinuke from '../features/antinuke.js';
@@ -329,6 +329,7 @@ export function startDashboard(client, port) {
           channelId: g.config.goodbye?.channelId ?? null,
           message: g.config.goodbye?.message ?? '',
           imageUrl: g.config.goodbye?.imageUrl ?? null,
+          banner: normalizeBanner(g.config.goodbye?.banner, GOODBYE_BANNER),
           defaultMessage: DEFAULT_GOODBYE,
         },
         autoroles: g.config.autoroles ?? [],
@@ -409,6 +410,7 @@ export function startDashboard(client, port) {
         if (text.length > 2000) throw new UserError('Poruka može imati najviše 2000 znakova.');
         req.g.config[kind] = { channelId: channel.id, message: text || null, imageUrl: imageUrlOf(imageUrl) };
         if (kind === 'welcome') req.g.config[kind].banner = normalizeBanner(banner);
+        if (kind === 'goodbye') req.g.config[kind].banner = normalizeBanner(banner, GOODBYE_BANNER);
       }
       db.save();
       ok(res);
@@ -420,7 +422,7 @@ export function startDashboard(client, port) {
       const payload = kind === 'welcome'
         ? await buildWelcomePayload(req.member, req.g.joins[req.userId]?.inviterId ?? null)
         : kind === 'goodbye'
-          ? goodbyePayload(req.member)
+          ? await buildGoodbyePayload(req.member)
           : boostPayload(req.member);
       await channel.send(payload).catch(() => {
         throw new UserError(`Ne mogu slati poruke u #${channel.name}.`);
@@ -833,10 +835,25 @@ export function startDashboard(client, port) {
     const cfg = socialAlerts.getConfig(guild.id);
     const channel = cfg.channelId && guild.channels.cache.get(cfg.channelId);
     const role = cfg.roleId && guild.roles.cache.get(cfg.roleId);
+    const routes = socialAlerts.ROUTE_KEYS.map((key) => {
+      const [platform, event] = key.split(':');
+      const id = cfg.channels?.[key] ?? null;
+      const routeChannel = id && guild.channels.cache.get(id);
+      return {
+        key,
+        platform,
+        event,
+        platformLabel: socialAlerts.PLATFORMS[platform].label,
+        eventLabel: event === 'live' ? 'Uživo' : 'Novi video',
+        channelId: routeChannel ? routeChannel.id : null,
+        channelName: routeChannel?.name ?? null,
+      };
+    });
     return {
       config: cfg,
       channel: channel ? { id: channel.id, name: channel.name } : null,
       role: role ? { id: role.id, name: role.name } : null,
+      routes,
       accounts: cfg.accounts.map((a) => socialAlerts.accountSummary(a)),
       platforms: Object.entries(socialAlerts.PLATFORMS).map(([key, def]) => ({ key, label: def.label, events: def.events })),
       defaultMessage: socialAlerts.DEFAULT_MESSAGE,
@@ -847,9 +864,21 @@ export function startDashboard(client, port) {
   api.put('/guilds/:gid/social', (req, res) => {
     const body = req.body ?? {};
     const enabled = Boolean(body.enabled);
+    const current = socialAlerts.getConfig(req.guild.id);
     let channelId = null;
     if (body.channelId) channelId = textChannel(req.guild, body.channelId).id;
-    if (enabled && !channelId) throw new UserError('Odaberi kanal za obavijesti.');
+    let channels = null;
+    if (body.channels && typeof body.channels === 'object') {
+      channels = {};
+      for (const key of socialAlerts.ROUTE_KEYS) {
+        const id = body.channels[key];
+        channels[key] = id ? textChannel(req.guild, id).id : null;
+      }
+    }
+    const effectiveChannels = channels ?? current.channels;
+    if (enabled && !channelId && !Object.values(effectiveChannels).some(Boolean)) {
+      throw new UserError('Odaberi glavni kanal ili barem jedan kanal po vrsti obavijesti.');
+    }
     let roleId = null;
     if (body.roleId) {
       const role = req.guild.roles.cache.get(String(body.roleId));
@@ -861,6 +890,7 @@ export function startDashboard(client, port) {
       channelId,
       roleId,
       message: String(body.message ?? '').slice(0, 2000),
+      ...(channels ? { channels } : {}),
     });
     ok(res, socialPayload(req.guild));
   });

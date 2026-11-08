@@ -12,8 +12,9 @@ and own their guild state. Commands and the dashboard call into them.
 - `buildWelcomePayload(member, inviterId)` renders the optional auto banner and falls
   back to the embed if rendering fails.
 - `sendWelcome(member, inviterId)` sends to `config.welcome.channelId`.
-- `goodbyePayload(member)` / `sendGoodbye(member)` build and send the leave message to
-  `config.goodbye.channelId`.
+- `goodbyePayload(member)` / `buildGoodbyePayload(member)` / `sendGoodbye(member)` build
+  and send the leave message to `config.goodbye.channelId`; the async builder renders an
+  optional banner with the same canvas renderer as welcome.
 - `boostPayload(member)` / `onMemberUpdate()` handle boost messages.
 
 Placeholders for welcome: `{user}`, `{username}`, `{server}`, `{memberCount}`, `{inviter}`,
@@ -61,6 +62,9 @@ Polls public pages and sends an embed when a tracked account changes state.
   one live alert instead of a live alert plus an upload alert.
 - `buildNotification()` supports `{account}`, `{username}`, `{platform}`, `{event}`,
   `{title}`, `{url}`, `{game}`, `{followers}` and an optional role mention.
+- Per-platform/type channel overrides live in `config.socialAlerts.channels`
+  (`youtube:upload`, `youtube:live`, `twitch:live`, `tiktok:upload`, `tiktok:live`).
+  `targetChannel()` falls back to the main `channelId`.
 - `checkGuild(guild, { notify, accountId })` is used by the poller and dashboard.
 - `start(client)` polls every `SOCIAL_POLL_MINUTES` (default 5, minimum 2).
 

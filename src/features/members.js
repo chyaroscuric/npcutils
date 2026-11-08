@@ -9,6 +9,7 @@ export const DEFAULT_WELCOME =
   'Dobrodošao/la {user} na **{server}**! 🎉\nTi si naš **{memberCount}.** član.\nPozvao/la te: {inviter}';
 export const DEFAULT_BOOST = 'Hvala {user} što je boostao/la **{server}**! 💜\nServer sada ima **{boosts}** boostova (level {level}).';
 export const DEFAULT_GOODBYE = '👋 **{username}** je napustio/la **{server}**.\nOstalo nas je **{memberCount}**.';
+export const GOODBYE_BANNER = { title: 'Dovidenja od {server}', subtitle: 'Ostalo nas je {memberCount}.' };
 
 export async function giveAutoroles(member) {
   const g = db.guild(member.guild.id);
@@ -79,7 +80,7 @@ export async function sendWelcome(member, inviterId) {
   await channel.send(await buildWelcomePayload(member, inviterId));
 }
 
-export function goodbyePayload(member) {
+export function goodbyePayload(member, { banner = null } = {}) {
   const g = db.guild(member.guild.id);
   const cfg = g.config.goodbye;
   const inviterId = g.joins[member.id]?.inviterId ?? null;
@@ -103,14 +104,43 @@ export function goodbyePayload(member) {
     .setTimestamp();
   if (member.user?.displayAvatarURL) embed.setThumbnail(member.user.displayAvatarURL({ size: 256 }));
   if (cfg?.imageUrl) embed.setImage(cfg.imageUrl);
-  return { embeds: [embed], allowedMentions: { parse: [] } };
+  const payload = { embeds: [embed], allowedMentions: { parse: [] } };
+  if (banner) {
+    embed.setImage('attachment://goodbye.png');
+    payload.files = [new AttachmentBuilder(banner, { name: 'goodbye.png' })];
+  }
+  return payload;
+}
+
+export async function buildGoodbyePayload(member) {
+  const cfg = db.guild(member.guild.id).config.goodbye;
+  const bannerCfg = normalizeBanner(cfg?.banner, GOODBYE_BANNER);
+  if (!bannerCfg.enabled || !bannerCfg.backgroundUrl) return goodbyePayload(member);
+  try {
+    const banner = await renderWelcomeBanner({
+      backgroundUrl: bannerCfg.backgroundUrl,
+      avatarUrl: member.user.displayAvatarURL({ extension: 'png', size: 512 }),
+      name: member.displayName ?? member.user.username,
+      serverName: member.guild.name,
+      title: bannerCfg.title,
+      subtitle: bannerCfg.subtitle,
+      accentColor: bannerCfg.accentColor,
+      nameColor: bannerCfg.nameColor,
+      overlay: bannerCfg.overlay,
+      memberCount: member.guild.memberCount,
+    });
+    return goodbyePayload(member, { banner });
+  } catch (err) {
+    console.warn('[goodbye] banner:', err.message);
+    return goodbyePayload(member);
+  }
 }
 
 export async function sendGoodbye(member) {
   const cfg = db.guild(member.guild.id).config.goodbye;
   const channel = cfg?.channelId && member.guild.channels.cache.get(cfg.channelId);
   if (!channel) return;
-  await channel.send(goodbyePayload(member));
+  await channel.send(await buildGoodbyePayload(member));
 }
 
 export function boostPayload(member) {

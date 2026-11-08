@@ -21,6 +21,10 @@ export const PLATFORMS = {
   tiktok: { label: 'TikTok', color: 0x25f4ee, events: ['upload', 'live'] },
 };
 
+export const ROUTE_KEYS = Object.entries(PLATFORMS).flatMap(([platform, def]) =>
+  def.events.map((event) => `${platform}:${event}`),
+);
+
 export const DEFAULT_MESSAGE = '{account} je {event} na **{platform}**!\\n{title}\\n{url}';
 
 const DEFAULT_STATE = {
@@ -48,7 +52,7 @@ const num = (value) => {
 };
 
 export function defaultConfig() {
-  return { enabled: false, channelId: null, roleId: null, message: '', accounts: [] };
+  return { enabled: false, channelId: null, roleId: null, message: '', channels: {}, accounts: [] };
 }
 
 export function normalizeState(raw) {
@@ -94,11 +98,17 @@ export function normalizeConfig(raw) {
     seen.add(key);
     accounts.push(account);
   }
+  const channels = {};
+  for (const key of ROUTE_KEYS) {
+    const id = raw.channels?.[key];
+    if (id) channels[key] = str(id, 64);
+  }
   return {
     enabled: Boolean(raw.enabled),
     channelId: raw.channelId ? str(raw.channelId, 64) : null,
     roleId: raw.roleId ? str(raw.roleId, 64) : null,
     message: str(raw.message, 2000),
+    channels,
     accounts: accounts.slice(0, MAX_ACCOUNTS),
   };
 }
@@ -119,7 +129,32 @@ export function saveConfig(guildId, input = {}) {
   if ('channelId' in input) cfg.channelId = input.channelId ? str(input.channelId, 64) : null;
   if ('roleId' in input) cfg.roleId = input.roleId ? str(input.roleId, 64) : null;
   if ('message' in input) cfg.message = str(input.message, 2000);
+  if (input.channels && typeof input.channels === 'object') {
+    const channels = { ...cfg.channels };
+    for (const key of ROUTE_KEYS) {
+      if (!(key in input.channels)) continue;
+      const id = input.channels[key];
+      if (id) channels[key] = str(id, 64);
+      else delete channels[key];
+    }
+    cfg.channels = channels;
+  }
   return persist(guildId, cfg);
+}
+
+export function hasChannel(cfg) {
+  return Boolean(cfg.channelId || Object.values(cfg.channels ?? {}).some(Boolean));
+}
+
+export function channelFor(cfg, platform, event) {
+  return cfg.channels?.[`${platform}:${event}`] || cfg.channelId || null;
+}
+
+export function targetChannel(guild, cfg, platform, event) {
+  const override = cfg.channels?.[`${platform}:${event}`];
+  const channel = override && guild.channels.cache.get(override);
+  if (channel) return channel;
+  return (cfg.channelId && guild.channels.cache.get(cfg.channelId)) || null;
 }
 
 export function addAccount(guildId, input = {}) {
@@ -525,7 +560,6 @@ async function checkAccount(cfg, account, { notify = true } = {}) {
 export async function checkGuild(guild, { notify = true, accountId = null } = {}) {
   const cfg = getConfig(guild.id);
   if (!cfg.accounts.length) return { accounts: [], checked: 0 };
-  const channel = cfg.channelId ? guild.channels.cache.get(cfg.channelId) : null;
   const results = [];
   let checked = 0;
   for (const account of cfg.accounts) {
@@ -534,8 +568,12 @@ export async function checkGuild(guild, { notify = true, accountId = null } = {}
     try {
       const notifications = await checkAccount(cfg, account, { notify });
       for (const item of notifications) {
-        if (!channel) break;
-        await channel.send(buildNotification(cfg, account, item.event, item.data));
+        const target = targetChannel(guild, cfg, account.platform, item.event);
+        if (!target) {
+          account.state.lastError = `Kanal za ${PLATFORMS[account.platform].label} ${item.event === 'live' ? 'uživo' : 'video'} nije dostupan.`;
+          continue;
+        }
+        await target.send(buildNotification(cfg, account, item.event, item.data));
         logActivity(
           guild.id,
           'social',
@@ -550,16 +588,16 @@ export async function checkGuild(guild, { notify = true, accountId = null } = {}
     results.push(accountSummary(account));
   }
   persist(guild.id, cfg);
-  return { accounts: results, checked, channelMissing: !channel };
+  return { accounts: results, checked, channelMissing: !hasChannel(cfg) };
 }
 
 export async function testNotification(guild, accountId = null) {
   const cfg = getConfig(guild.id);
   const account = cfg.accounts.find((a) => a.id === accountId) ?? cfg.accounts[0];
   if (!account) throw new Error('Prvo dodaj barem jedan račun.');
-  const channel = cfg.channelId && guild.channels.cache.get(cfg.channelId);
-  if (!channel) throw new Error('Odaberi i spremi kanal za obavijesti.');
   const event = account.events.live ? 'live' : 'upload';
+  const channel = targetChannel(guild, cfg, account.platform, event);
+  if (!channel) throw new Error('Odaberi i spremi kanal za tu vrstu obavijesti.');
   const url = account.platform === 'twitch'
     ? `https://www.twitch.tv/${account.account}`
     : account.platform === 'youtube'
@@ -585,7 +623,7 @@ async function tick(client) {
   for (const guild of client.guilds.cache.values()) {
     if (running.has(guild.id)) continue;
     const cfg = getConfig(guild.id);
-    if (!cfg.enabled || !cfg.channelId || !cfg.accounts.length) continue;
+    if (!cfg.enabled || !hasChannel(cfg) || !cfg.accounts.length) continue;
     running.add(guild.id);
     try {
       await checkGuild(guild);

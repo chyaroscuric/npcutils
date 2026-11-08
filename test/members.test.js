@@ -45,6 +45,14 @@ test('default goodbye message works', () => {
   assert.match(embed.description, /42/);
 });
 
+test('goodbye payload can attach a generated banner', () => {
+  db.guild('g1').config.goodbye = { channelId: 'c1', message: 'Bok {username}' };
+  const payload = members.goodbyePayload(fakeMember(), { banner: Buffer.from('fake-png') });
+  const embed = payload.embeds[0].toJSON();
+  assert.equal(embed.image.url, 'attachment://goodbye.png');
+  assert.equal(payload.files.length, 1);
+});
+
 test('sendGoodbye sends to the configured channel', async () => {
   const sent = [];
   const member = fakeMember();

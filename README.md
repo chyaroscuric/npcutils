@@ -193,7 +193,7 @@ Dashboard → **Obavijesti** prati javne YouTube, Twitch i TikTok račune i šal
 - Twitch počne stream (uključivo naslov i igru),
 - TikTok objavi novi video (broj videa) ili počne live.
 
-Prva provjera samo zapamti stanje, a svaka sljedeća promjena šalje obavijest. Možeš odabrati kanal, rolu koja se spominje, tekst poruke i pojedinačno uključiti **Video** i **Uživo** za svaki račun. Provjera ide svakih 5 minuta (`SOCIAL_POLL_MINUTES`). TikTok i YouTube link ponekad vode na profil jer javna stranica ne daje direktan link na video bez API-ja.
+Prva provjera samo zapamti stanje, a svaka sljedeća promjena šalje obavijest. Možeš odabrati glavni kanal, role koja se spominje, tekst poruke i pojedinačno uključiti **Video** i **Uživo** za svaki račun. Za svaku platformu i vrstu (npr. YouTube video, YouTube live, Twitch live, TikTok video, TikTok live) možeš odabrati i poseban kanal; ako ostaviš prazno, koristi se glavni kanal. Provjera ide svakih 5 minuta (`SOCIAL_POLL_MINUTES`). TikTok i YouTube link ponekad vode na profil jer javna stranica ne daje direktan link na video bez API-ja.
 
 ## 🖼️ Welcome banner
 
@@ -211,6 +211,12 @@ Kad član napusti server, bot može poslati poruku odlaska u odabrani kanal. Pod
 
 ```
 /goodbye set kanal:#odlasci poruka:👋 {username} je napustio/la {server}. Ostalo nas je {memberCount}.
+```
+
+I goodbye može imati automatski banner s avatarom i imenom člana:
+
+```
+/goodbye set kanal:#odlasci banner:https://example.com/pozadina.png banner_tekst:Dovidenja od {server}
 ```
 
 Varijable: `{user}`, `{username}`, `{server}`, `{memberCount}`, `{inviter}`, `{invites}`, `{joined}`. `/goodbye test` pošalje testnu poruku, `/goodbye off` isključi.

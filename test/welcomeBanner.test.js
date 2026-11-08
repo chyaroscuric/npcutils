@@ -26,6 +26,13 @@ test('invalid background URLs are ignored', () => {
   assert.equal(normalizeBanner({ backgroundUrl: 'ftp://example.com/a.png' }).backgroundUrl, '');
 });
 
+test('banner defaults can be overridden per message type', () => {
+  const banner = normalizeBanner(undefined, { title: 'Dovidenja od {server}', subtitle: 'Ostalo nas je {memberCount}.' });
+  assert.equal(banner.title, 'Dovidenja od {server}');
+  assert.equal(banner.subtitle, 'Ostalo nas je {memberCount}.');
+  assert.equal(banner.enabled, false);
+});
+
 test('banner renders a PNG without a background or avatar', async () => {
   const buffer = await renderWelcomeBanner({
     name: 'Mario',

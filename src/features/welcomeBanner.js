@@ -56,16 +56,17 @@ function safeUrl(value) {
   }
 }
 
-export function normalizeBanner(raw) {
-  if (!raw || typeof raw !== 'object') return { ...DEFAULT_BANNER };
+export function normalizeBanner(raw, defaults = {}) {
+  const base = { ...DEFAULT_BANNER, ...defaults };
+  if (!raw || typeof raw !== 'object') return { ...base };
   return {
     enabled: Boolean(raw.enabled),
     backgroundUrl: safeUrl(raw.backgroundUrl),
-    title: String(raw.title ?? DEFAULT_BANNER.title).trim().slice(0, 160) || DEFAULT_BANNER.title,
-    subtitle: String(raw.subtitle ?? DEFAULT_BANNER.subtitle).trim().slice(0, 160),
-    accentColor: hex(raw.accentColor, DEFAULT_BANNER.accentColor),
-    nameColor: hex(raw.nameColor, DEFAULT_BANNER.nameColor),
-    overlay: Math.min(0.8, Math.max(0, Number(raw.overlay ?? DEFAULT_BANNER.overlay) || 0)),
+    title: String(raw.title ?? base.title).trim().slice(0, 160) || base.title,
+    subtitle: String(raw.subtitle ?? base.subtitle).trim().slice(0, 160),
+    accentColor: hex(raw.accentColor, base.accentColor),
+    nameColor: hex(raw.nameColor, base.nameColor),
+    overlay: Math.min(0.8, Math.max(0, Number(raw.overlay ?? base.overlay) || 0)),
   };
 }
 

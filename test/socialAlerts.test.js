@@ -95,6 +95,39 @@ test('config normalizes accounts and deduplicates them', () => {
   assert.deepEqual(cfg.accounts[1].events, { live: true });
 });
 
+test('per-platform channels are normalized and fall back to the main channel', () => {
+  const cfg = s.normalizeConfig({
+    enabled: true,
+    channelId: 'main',
+    channels: {
+      'youtube:upload': 'yt-videos',
+      'twitch:live': 'twitch-live',
+      'nope:event': 'ignored',
+    },
+  });
+  assert.equal(cfg.channels['youtube:upload'], 'yt-videos');
+  assert.equal(cfg.channels['twitch:live'], 'twitch-live');
+  assert.equal(cfg.channels['nope:event'], undefined);
+  assert.equal(s.channelFor(cfg, 'youtube', 'upload'), 'yt-videos');
+  assert.equal(s.channelFor(cfg, 'tiktok', 'live'), 'main');
+  assert.equal(s.hasChannel(cfg), true);
+  assert.equal(s.hasChannel(s.normalizeConfig({ channels: { 'youtube:live': 'only' } })), true);
+  assert.equal(s.hasChannel(s.normalizeConfig({})), false);
+});
+
+test('route channels can be saved and cleared', () => {
+  s.saveConfig('g2', { channelId: 'main', channels: { 'youtube:upload': 'a', 'tiktok:live': 'b' } });
+  let cfg = s.getConfig('g2');
+  assert.equal(cfg.channels['youtube:upload'], 'a');
+  assert.equal(cfg.channels['tiktok:live'], 'b');
+  s.saveConfig('g2', { channels: { 'youtube:upload': null } });
+  cfg = s.getConfig('g2');
+  assert.equal(cfg.channels['youtube:upload'], undefined);
+  assert.equal(cfg.channels['tiktok:live'], 'b');
+  const guild = { channels: { cache: new Map([['main', { id: 'main' }], ['b', { id: 'b' }]]) } };
+  assert.equal(s.targetChannel(guild, cfg, 'tiktok', 'live').id, 'b');
+  assert.equal(s.targetChannel(guild, cfg, 'youtube', 'upload').id, 'main');
+});
 test('accounts can be added, updated and removed', () => {
   const account = s.addAccount('g1', { platform: 'youtube', account: '@test' });
   assert.equal(account.account, 'test');
