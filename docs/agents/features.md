@@ -33,10 +33,11 @@ Uses `@napi-rs/canvas` to draw a 1024×512 PNG:
 `normalizeBanner()` validates URLs and hex colours. Backgrounds are cached in memory for
 10 minutes. Uploaded images are accepted as raw PNG/JPG/WebP/GIF (max 8 MB), cropped to
 1024×512 and stored as a JPEG data URL in the guild config, so they work behind the BYOT
-proxy without a public file server. `POST /guilds/:gid/banner-preview` renders a live
-preview for the dashboard designer. If the background or avatar fetch fails, the renderer
-uses a flat fallback; `buildWelcomePayload()` still falls back to the normal embed if the
-whole render fails.
+proxy without a public file server. The dashboard designer stores normalized positions
+and sizes for the avatar and name (`avatarX/Y/Size`, `nameX/Y/Size`) and lets the user
+drag both over the background. `POST /guilds/:gid/banner-preview` renders a live preview.
+If the background or avatar fetch fails, the renderer uses a flat fallback;
+`buildWelcomePayload()` still falls back to the normal embed if the whole render fails.
 
 ### `stats.js` + `socialStats.js`
 

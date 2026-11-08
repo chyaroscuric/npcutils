@@ -34,6 +34,27 @@ test('banner defaults can be overridden per message type', () => {
   assert.equal(banner.enabled, false);
 });
 
+test('banner layout positions and sizes are clamped', () => {
+  const banner = normalizeBanner({
+    avatarX: -1,
+    avatarY: 2,
+    avatarSize: 5,
+    nameX: 0.4,
+    nameY: 0.6,
+    nameSize: 0.01,
+    showTitle: false,
+    showSubtitle: false,
+  });
+  assert.equal(banner.avatarX, 0);
+  assert.equal(banner.avatarY, 1);
+  assert.equal(banner.avatarSize, 0.4);
+  assert.equal(banner.nameX, 0.4);
+  assert.equal(banner.nameY, 0.6);
+  assert.equal(banner.nameSize, 0.03);
+  assert.equal(banner.showTitle, false);
+  assert.equal(banner.showSubtitle, false);
+});
+
 test('banner renders a PNG without a background or avatar', async () => {
   const buffer = await renderWelcomeBanner({
     name: 'Mario',

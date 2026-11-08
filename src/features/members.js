@@ -64,6 +64,14 @@ export async function buildWelcomePayload(member, inviterId) {
       accentColor: bannerCfg.accentColor,
       nameColor: bannerCfg.nameColor,
       overlay: bannerCfg.overlay,
+      showTitle: bannerCfg.showTitle,
+      showSubtitle: bannerCfg.showSubtitle,
+      avatarX: bannerCfg.avatarX,
+      avatarY: bannerCfg.avatarY,
+      avatarSize: bannerCfg.avatarSize,
+      nameX: bannerCfg.nameX,
+      nameY: bannerCfg.nameY,
+      nameSize: bannerCfg.nameSize,
       memberCount: member.guild.memberCount,
     });
     return welcomePayload(member, inviterId, { banner });
@@ -127,6 +135,14 @@ export async function buildGoodbyePayload(member) {
       accentColor: bannerCfg.accentColor,
       nameColor: bannerCfg.nameColor,
       overlay: bannerCfg.overlay,
+      showTitle: bannerCfg.showTitle,
+      showSubtitle: bannerCfg.showSubtitle,
+      avatarX: bannerCfg.avatarX,
+      avatarY: bannerCfg.avatarY,
+      avatarSize: bannerCfg.avatarSize,
+      nameX: bannerCfg.nameX,
+      nameY: bannerCfg.nameY,
+      nameSize: bannerCfg.nameSize,
       memberCount: member.guild.memberCount,
     });
     return goodbyePayload(member, { banner });

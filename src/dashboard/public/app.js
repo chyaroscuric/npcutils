@@ -1694,6 +1694,16 @@
     const banner = showBanner ? (c.banner || {}) : {};
     const bannerTitleDefault = isG ? 'Dovidenja od {server}' : 'Dobrodošao/la kod {server}';
     const bannerSubtitleDefault = isG ? 'Ostalo nas je {memberCount}.' : 'Novi član · {memberCount}.';
+    const sampleName = state.me?.user?.displayName || state.me?.user?.username || 'Ime';
+    const sampleAvatar = state.me?.user?.avatarUrl || '';
+    const layout = {
+      avatarX: banner.avatarX ?? 0.16,
+      avatarY: banner.avatarY ?? 0.75,
+      avatarSize: banner.avatarSize ?? 0.133,
+      nameX: banner.nameX ?? 0.55,
+      nameY: banner.nameY ?? 0.75,
+      nameSize: banner.nameSize ?? 0.074,
+    };
     return html`<div class="cols cols-form-right">
       <section class="card" aria-labelledby="msg-h">
         <div class="card-head"><div><h2 class="card-title" id="msg-h">${title}</h2>
@@ -1715,20 +1725,40 @@
               <div class="section-gap">
                 <h3 class="sub-title">Dizajner bannera</h3>
                 <label class="toggle"><input type="checkbox" role="switch" name="bannerEnabled" ${banner.enabled ? raw('checked') : ''}><span class="track" aria-hidden="true"></span><span>Uključi automatski banner</span></label>
-                <p class="help">Bot stavi avatar ${isG ? 'člana koji odlazi' : 'novog člana'} u krug i njegovo ime u bijelu traku. Učitaj sliku ili zalijepi URL, pa provjeri pregled.</p>
+                <p class="help">Učitaj pozadinu, zatim povuci <strong>krug s avatarom</strong> i <strong>ime</strong> tamo gdje želiš. Ime i avatar se automatski popunjavaju za svakog člana.</p>
                 <div class="banner-designer">
-                  <div class="banner-preview-box">
-                    <img data-banner-preview src="${banner.backgroundUrl || ''}" alt="Pregled bannera" ${banner.backgroundUrl ? '' : raw('hidden')}>
-                    <p data-banner-empty ${banner.backgroundUrl ? raw('hidden') : ''}>Nema pozadine. Učitaj sliku ispod.</p>
+                  <div class="banner-canvas" data-banner-canvas style="--avatar-size:${layout.avatarSize};--name-size:${layout.nameSize};--overlay:${banner.overlay ?? 0.32}">
+                    <img data-banner-bg src="${banner.backgroundUrl || ''}" alt="" ${banner.backgroundUrl ? '' : raw('hidden')}>
+                    <div class="banner-overlay"></div>
+                    <div class="banner-drag-avatar" data-drag="avatar" style="left:${layout.avatarX * 100}%;top:${layout.avatarY * 100}%;background-image:${sampleAvatar ? `url('${sampleAvatar}')` : 'none'};border-color:${banner.accentColor || '#f472b6'}"></div>
+                    <div class="banner-drag-name" data-drag="name" style="left:${layout.nameX * 100}%;top:${layout.nameY * 100}%;color:${banner.nameColor || '#1f2937'}">${sampleName}</div>
+                    <p class="banner-empty" data-banner-empty ${banner.backgroundUrl ? raw('hidden') : ''}>Učitaj pozadinu da počneš.</p>
                   </div>
                   <div class="stack">
                     <input type="hidden" name="bannerUrl" value="${banner.backgroundUrl || ''}">
+                    <input type="hidden" name="bannerAvatarX" value="${layout.avatarX}">
+                    <input type="hidden" name="bannerAvatarY" value="${layout.avatarY}">
+                    <input type="hidden" name="bannerAvatarSize" value="${layout.avatarSize}">
+                    <input type="hidden" name="bannerNameX" value="${layout.nameX}">
+                    <input type="hidden" name="bannerNameY" value="${layout.nameY}">
+                    <input type="hidden" name="bannerNameSize" value="${layout.nameSize}">
                     <label class="btn">${icon('ti-upload')}Učitaj sliku<input type="file" data-banner-file accept="image/png,image/jpeg,image/webp,image/gif" hidden></label>
                     <button type="button" class="btn" data-action="banner-remove">${icon('ti-trash')}Ukloni sliku</button>
                     <input class="input" data-banner-external type="url" maxlength="2048" value="${banner.backgroundUrl && !String(banner.backgroundUrl).startsWith('data:') ? banner.backgroundUrl : ''}" placeholder="ili zalijepi URL slike">
                     <p class="help">PNG, JPG, WebP ili GIF do 8 MB. Slika se automatski obrezuje na 1024×512.</p>
                   </div>
                 </div>
+                <div class="banner-controls">
+                  <label class="banner-control"><span>Veličina avatara</span><input type="range" data-banner-size="avatar" min="0.05" max="0.4" step="0.005" value="${layout.avatarSize}"></label>
+                  <label class="banner-control"><span>Veličina imena</span><input type="range" data-banner-size="name" min="0.03" max="0.2" step="0.002" value="${layout.nameSize}"></label>
+                  ${field({ name: 'bannerOverlay', label: 'Zatamnjenje', id: id.boverlay,
+                    control: html`<input class="input" id="${id.boverlay}" name="bannerOverlay" data-banner-overlay type="range" min="0" max="0.8" step="0.05" value="${banner.overlay ?? 0.32}">` })}
+                </div>
+                <div class="field-row section-gap">
+                  <label class="toggle"><input type="checkbox" role="switch" name="bannerShowTitle" ${banner.showTitle !== false ? raw('checked') : ''}><span class="track" aria-hidden="true"></span><span>Prikaži naslov</span></label>
+                  <label class="toggle"><input type="checkbox" role="switch" name="bannerShowSubtitle" ${banner.showSubtitle !== false ? raw('checked') : ''}><span class="track" aria-hidden="true"></span><span>Prikaži podnaslov</span></label>
+                </div>
+                <p class="help">Ako su naslov i tekst već dio pozadinske slike, isključi ih da se ne dupliciraju.</p>
                 <div class="field-row">
                   ${field({ name: 'bannerTitle', label: 'Tekst na banneru', id: id.btitle, help: 'Varijable: {server}, {username}, {memberCount}.',
                     control: html`<input class="input" id="${id.btitle}" name="bannerTitle" maxlength="160" value="${banner.title || bannerTitleDefault}" aria-describedby="${id.btitle}-help">` })}
@@ -1740,12 +1770,11 @@
                     control: html`<input class="input" id="${id.bacc}" name="bannerAccent" type="color" value="${banner.accentColor || '#f472b6'}">` })}
                   ${field({ name: 'bannerName', label: 'Boja imena', id: id.bname,
                     control: html`<input class="input" id="${id.bname}" name="bannerName" type="color" value="${banner.nameColor || '#1f2937'}">` })}
-                  ${field({ name: 'bannerOverlay', label: 'Zatamnjenje', id: id.boverlay,
-                    control: html`<input class="input" id="${id.boverlay}" name="bannerOverlay" type="range" min="0" max="0.8" step="0.05" value="${banner.overlay ?? 0.32}">` })}
                 </div>
                 <div class="form-actions">
-                  <button type="button" class="btn" data-action="banner-preview">${icon('ti-eye')}Osvježi pregled bannera</button>
+                  <button type="button" class="btn" data-action="banner-preview">${icon('ti-eye')}Prikaži stvarni pregled</button>
                 </div>
+                <img class="banner-server-preview" data-banner-server-preview alt="Stvarni pregled bannera" hidden>
               </div>` : ''}
             <div class="field">
               <span class="label" id="${id.msg}-vars">Varijable</span>
@@ -1809,6 +1838,9 @@
     formValue(f, 'enabled'), formValue(f, 'channelId'), formValue(f, 'message'), formValue(f, 'imageUrl'),
     formValue(f, 'bannerEnabled'), formValue(f, 'bannerUrl'), formValue(f, 'bannerTitle'), formValue(f, 'bannerSubtitle'),
     formValue(f, 'bannerAccent'), formValue(f, 'bannerName'), formValue(f, 'bannerOverlay'),
+    formValue(f, 'bannerShowTitle'), formValue(f, 'bannerShowSubtitle'),
+    formValue(f, 'bannerAvatarX'), formValue(f, 'bannerAvatarY'), formValue(f, 'bannerAvatarSize'),
+    formValue(f, 'bannerNameX'), formValue(f, 'bannerNameY'), formValue(f, 'bannerNameSize'),
   ]);
   function bannerFormValue(f) {
     return {
@@ -1819,7 +1851,30 @@
       accentColor: formValue(f, 'bannerAccent') || null,
       nameColor: formValue(f, 'bannerName') || null,
       overlay: Number(formValue(f, 'bannerOverlay') ?? 0.32),
+      showTitle: Boolean(formValue(f, 'bannerShowTitle')),
+      showSubtitle: Boolean(formValue(f, 'bannerShowSubtitle')),
+      avatarX: Number(formValue(f, 'bannerAvatarX') ?? 0.16),
+      avatarY: Number(formValue(f, 'bannerAvatarY') ?? 0.75),
+      avatarSize: Number(formValue(f, 'bannerAvatarSize') ?? 0.133),
+      nameX: Number(formValue(f, 'bannerNameX') ?? 0.55),
+      nameY: Number(formValue(f, 'bannerNameY') ?? 0.75),
+      nameSize: Number(formValue(f, 'bannerNameSize') ?? 0.074),
     };
+  }
+  let bannerDrag = null;
+  function setBannerDrag(handle, x, y) {
+    const canvas = handle.closest('[data-banner-canvas]');
+    const form = canvas?.closest('form');
+    if (!canvas || !form) return;
+    const kind = handle.dataset.drag;
+    const left = Math.min(1, Math.max(0, x));
+    const top = Math.min(1, Math.max(0, y));
+    handle.style.left = `${left * 100}%`;
+    handle.style.top = `${top * 100}%`;
+    const xInput = form.querySelector(`input[name="banner${kind === 'avatar' ? 'Avatar' : 'Name'}X"]`);
+    const yInput = form.querySelector(`input[name="banner${kind === 'avatar' ? 'Avatar' : 'Name'}Y"]`);
+    if (xInput) xInput.value = left.toFixed(4);
+    if (yInput) yInput.value = top.toFixed(4);
   }
   inputs.msg = (f) => updateMsgPreview(f);
   actions['insert-var'] = (btn) => {
@@ -1844,15 +1899,20 @@
     if (hidden) hidden.value = '';
     const external = f?.querySelector('[data-banner-external]');
     if (external) external.value = '';
-    const img = f?.querySelector('[data-banner-preview]');
+    const img = f?.querySelector('[data-banner-bg]');
     if (img) {
-      if (img.dataset.blob) URL.revokeObjectURL(img.dataset.blob);
       img.removeAttribute('src');
-      img.dataset.blob = '';
       img.hidden = true;
     }
     const empty = f?.querySelector('[data-banner-empty]');
     if (empty) empty.hidden = false;
+    const server = f?.querySelector('[data-banner-server-preview]');
+    if (server) {
+      if (server.dataset.blob) URL.revokeObjectURL(server.dataset.blob);
+      server.removeAttribute('src');
+      server.dataset.blob = '';
+      server.hidden = true;
+    }
     toast('info', 'Slika je uklonjena', 'Spremi promjene da ju ukloniš i iz postavki.');
   };
   async function uploadBanner(input) {
@@ -1866,28 +1926,34 @@
     }
     const { g } = state.page;
     try {
-      const res = await fetch(g$(g.id, `/banner-upload?kind=${encodeURIComponent(form.dataset.kind)}`), {
+      const res = await fetch(appUrl(g$(g.id, `/banner-upload?kind=${encodeURIComponent(form.dataset.kind)}`)), {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'X-Dashboard': '1', 'Content-Type': file.type || 'application/octet-stream' },
         body: file,
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Upload nije uspio.');
+      if (!res.ok) throw new Error(data.error || `Upload nije uspio (HTTP ${res.status}).`);
       const hidden = form.querySelector('input[name="bannerUrl"]');
       if (hidden) hidden.value = data.url;
       const external = form.querySelector('[data-banner-external]');
       if (external) external.value = '';
-      const img = form.querySelector('[data-banner-preview]');
+      const enable = form.querySelector('input[name="bannerEnabled"]');
+      if (enable) enable.checked = true;
+      const img = form.querySelector('[data-banner-bg]');
       if (img) {
-        if (img.dataset.blob) URL.revokeObjectURL(img.dataset.blob);
-        img.dataset.blob = '';
         img.src = data.url;
         img.hidden = false;
       }
       const empty = form.querySelector('[data-banner-empty]');
       if (empty) empty.hidden = true;
-      toast('success', 'Slika je učitana', 'Klikni Spremi promjene da ju sačuvaš.');
+      const server = form.querySelector('[data-banner-server-preview]');
+      if (server) {
+        if (server.dataset.blob) URL.revokeObjectURL(server.dataset.blob);
+        server.dataset.blob = '';
+        server.hidden = true;
+      }
+      toast('success', 'Slika je učitana', 'Povuci avatar i ime po slici, pa klikni Spremi promjene.');
     } catch (err) {
       reportError(err, 'Upload nije uspio');
     } finally {
@@ -1904,7 +1970,7 @@
     }
     const { g } = state.page;
     try {
-      const res = await fetch(g$(g.id, '/banner-preview'), {
+      const res = await fetch(appUrl(g$(g.id, '/banner-preview')), {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', 'X-Dashboard': '1' },
@@ -1915,7 +1981,7 @@
         throw new Error(data.error || 'Pregled nije uspio.');
       }
       const blob = await res.blob();
-      const img = f.querySelector('[data-banner-preview]');
+      const img = f.querySelector('[data-banner-server-preview]');
       if (img) {
         if (img.dataset.blob) URL.revokeObjectURL(img.dataset.blob);
         const url = URL.createObjectURL(blob);
@@ -4713,7 +4779,48 @@
       if (!external) return;
       const hidden = external.closest('form')?.querySelector('input[name="bannerUrl"]');
       if (hidden) hidden.value = external.value.trim();
+      if (external.value.trim()) {
+        const enable = external.closest('form')?.querySelector('input[name="bannerEnabled"]');
+        if (enable) enable.checked = true;
+      }
     });
+    document.addEventListener('input', (e) => {
+      const size = e.target.closest && e.target.closest('[data-banner-size]');
+      if (size) {
+        const form = size.closest('form');
+        const canvas = form?.querySelector('[data-banner-canvas]');
+        const kind = size.dataset.bannerSize;
+        const hidden = form?.querySelector(`input[name="banner${kind === 'avatar' ? 'Avatar' : 'Name'}Size"]`);
+        if (hidden) hidden.value = size.value;
+        if (canvas) canvas.style.setProperty(kind === 'avatar' ? '--avatar-size' : '--name-size', size.value);
+      }
+      const overlay = e.target.closest && e.target.closest('[data-banner-overlay]');
+      if (overlay) {
+        const canvas = overlay.closest('form')?.querySelector('[data-banner-canvas]');
+        if (canvas) canvas.style.setProperty('--overlay', overlay.value);
+      }
+    });
+    document.addEventListener('pointerdown', (e) => {
+      const handle = e.target.closest && e.target.closest('[data-drag]');
+      if (!handle || !handle.closest('[data-banner-canvas]')) return;
+      e.preventDefault();
+      bannerDrag = { handle, pointerId: e.pointerId };
+      handle.setPointerCapture?.(e.pointerId);
+      handle.classList.add('is-dragging');
+    });
+    document.addEventListener('pointermove', (e) => {
+      if (!bannerDrag || e.pointerId !== bannerDrag.pointerId) return;
+      const canvas = bannerDrag.handle.closest('[data-banner-canvas]');
+      const rect = canvas.getBoundingClientRect();
+      setBannerDrag(bannerDrag.handle, (e.clientX - rect.left) / rect.width, (e.clientY - rect.top) / rect.height);
+    });
+    const endDrag = (e) => {
+      if (!bannerDrag || e.pointerId !== bannerDrag.pointerId) return;
+      bannerDrag.handle.classList.remove('is-dragging');
+      bannerDrag = null;
+    };
+    document.addEventListener('pointerup', endDrag);
+    document.addEventListener('pointercancel', endDrag);
     // Broken avatar images fall back to initials.
     document.addEventListener('error', (e) => {
       const img = e.target;

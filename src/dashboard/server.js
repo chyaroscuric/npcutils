@@ -459,6 +459,14 @@ export function startDashboard(client, port) {
         accentColor: banner.accentColor,
         nameColor: banner.nameColor,
         overlay: banner.overlay,
+        showTitle: banner.showTitle,
+        showSubtitle: banner.showSubtitle,
+        avatarX: banner.avatarX,
+        avatarY: banner.avatarY,
+        avatarSize: banner.avatarSize,
+        nameX: banner.nameX,
+        nameY: banner.nameY,
+        nameSize: banner.nameSize,
         memberCount: req.guild.memberCount,
       });
       res.type('png').send(buffer);

@@ -26,6 +26,14 @@ export const DEFAULT_BANNER = {
   accentColor: '#f472b6',
   nameColor: '#1f2937',
   overlay: 0.32,
+  showTitle: true,
+  showSubtitle: true,
+  avatarX: 0.16,
+  avatarY: 0.75,
+  avatarSize: 0.133,
+  nameX: 0.55,
+  nameY: 0.75,
+  nameSize: 0.074,
 };
 
 const backgroundCache = new Map(); // url -> { at, image }
@@ -36,6 +44,11 @@ function hex(value, fallback) {
   if (/^#[0-9a-f]{3}$/i.test(raw)) return `#${raw[1]}${raw[1]}${raw[2]}${raw[2]}${raw[3]}${raw[3]}`.toLowerCase();
   return fallback;
 }
+
+const clamp = (value, min, max, fallback) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+};
 
 function rgba(hexColor, alpha) {
   const value = hex(hexColor, DEFAULT_BANNER.accentColor).slice(1);
@@ -69,7 +82,15 @@ export function normalizeBanner(raw, defaults = {}) {
     subtitle: String(raw.subtitle ?? base.subtitle).trim().slice(0, 160),
     accentColor: hex(raw.accentColor, base.accentColor),
     nameColor: hex(raw.nameColor, base.nameColor),
-    overlay: Math.min(0.8, Math.max(0, Number(raw.overlay ?? base.overlay) || 0)),
+    overlay: clamp(raw.overlay, 0, 0.8, base.overlay),
+    showTitle: raw.showTitle !== false,
+    showSubtitle: raw.showSubtitle !== false,
+    avatarX: clamp(raw.avatarX, 0, 1, base.avatarX),
+    avatarY: clamp(raw.avatarY, 0, 1, base.avatarY),
+    avatarSize: clamp(raw.avatarSize, 0.05, 0.4, base.avatarSize),
+    nameX: clamp(raw.nameX, 0, 1, base.nameX),
+    nameY: clamp(raw.nameY, 0, 1, base.nameY),
+    nameSize: clamp(raw.nameSize, 0.03, 0.2, base.nameSize),
   };
 }
 
@@ -137,48 +158,51 @@ function fitFont(ctx, text, maxWidth, start, min) {
   return size;
 }
 
-async function drawAvatar(ctx, url, accent) {
-  const x = AVATAR_X;
-  const y = AVATAR_Y;
+async function drawAvatar(ctx, url, cx, cy, size, accent) {
+  const x = cx - size / 2;
+  const y = cy - size / 2;
   ctx.save();
   ctx.beginPath();
-  ctx.arc(x + AVATAR / 2, y + AVATAR / 2, AVATAR / 2, 0, Math.PI * 2);
+  ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
   ctx.closePath();
   ctx.fillStyle = '#4f545c';
   ctx.fill();
   ctx.clip();
   try {
     const image = await loadImage(await fetchImage(url));
-    const scale = Math.max(AVATAR / image.width, AVATAR / image.height);
+    const scale = Math.max(size / image.width, size / image.height);
     const w = image.width * scale;
     const h = image.height * scale;
-    ctx.drawImage(image, x + (AVATAR - w) / 2, y + (AVATAR - h) / 2, w, h);
+    ctx.drawImage(image, cx - w / 2, cy - h / 2, w, h);
   } catch {
     // keep the neutral fallback circle
   }
   ctx.restore();
   ctx.save();
   ctx.beginPath();
-  ctx.arc(x + AVATAR / 2, y + AVATAR / 2, AVATAR / 2 - 3, 0, Math.PI * 2);
+  ctx.arc(cx, cy, size / 2 - 3, 0, Math.PI * 2);
   ctx.strokeStyle = accent;
-  ctx.lineWidth = 6;
+  ctx.lineWidth = Math.max(4, Math.round(size * 0.044));
   ctx.stroke();
   ctx.restore();
 }
 
-function drawNameBox(ctx, name, nameColor) {
+function drawNameBox(ctx, name, cx, cy, fontPx, nameColor) {
   ctx.save();
-  ctx.font = `38px ${FONT}`;
-  const width = Math.min(WIDTH - NAME_BOX_X - 64, Math.max(300, ctx.measureText(name).width + 96));
-  roundedRect(ctx, NAME_BOX_X, NAME_BOX_Y, width, NAME_BOX_H, NAME_BOX_H / 2);
+  ctx.font = `${fontPx}px ${FONT}`;
+  const height = Math.max(48, Math.round(fontPx * 2.1));
+  const width = Math.min(WIDTH - 48, Math.max(200, ctx.measureText(name).width + 96));
+  const x = Math.min(WIDTH - 24 - width, Math.max(24, cx - width / 2));
+  const y = Math.min(HEIGHT - 24 - height, Math.max(24, cy - height / 2));
+  roundedRect(ctx, x, y, width, height, height / 2);
   ctx.fillStyle = 'rgba(255,255,255,0.94)';
   ctx.fill();
   ctx.fillStyle = nameColor;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const size = fitFont(ctx, name, width - 48, 38, 18);
+  const size = fitFont(ctx, name, width - 48, fontPx, 18);
   ctx.font = `${size}px ${FONT}`;
-  ctx.fillText(name, NAME_BOX_X + width / 2, NAME_BOX_Y + NAME_BOX_H / 2 + 1);
+  ctx.fillText(name, x + width / 2, y + height / 2 + 1);
   ctx.restore();
 }
 
@@ -192,6 +216,14 @@ export async function renderWelcomeBanner({
   accentColor = DEFAULT_BANNER.accentColor,
   nameColor = DEFAULT_BANNER.nameColor,
   overlay = DEFAULT_BANNER.overlay,
+  showTitle = true,
+  showSubtitle = true,
+  avatarX = DEFAULT_BANNER.avatarX,
+  avatarY = DEFAULT_BANNER.avatarY,
+  avatarSize = DEFAULT_BANNER.avatarSize,
+  nameX = DEFAULT_BANNER.nameX,
+  nameY = DEFAULT_BANNER.nameY,
+  nameSize = DEFAULT_BANNER.nameSize,
   memberCount,
 } = {}) {
   const canvas = createCanvas(WIDTH, HEIGHT);
@@ -202,6 +234,14 @@ export async function renderWelcomeBanner({
     username: name ?? '',
     name: name ?? '',
     memberCount: memberCount ?? '',
+  };
+  const layout = {
+    avatarX: clamp(avatarX, 0, 1, DEFAULT_BANNER.avatarX),
+    avatarY: clamp(avatarY, 0, 1, DEFAULT_BANNER.avatarY),
+    avatarSize: clamp(avatarSize, 0.05, 0.4, DEFAULT_BANNER.avatarSize),
+    nameX: clamp(nameX, 0, 1, DEFAULT_BANNER.nameX),
+    nameY: clamp(nameY, 0, 1, DEFAULT_BANNER.nameY),
+    nameSize: clamp(nameSize, 0.03, 0.2, DEFAULT_BANNER.nameSize),
   };
 
   ctx.fillStyle = '#1c1e23';
@@ -215,34 +255,40 @@ export async function renderWelcomeBanner({
   }
   ctx.fillStyle = `rgba(0,0,0,${Math.min(0.8, Math.max(0, Number(overlay) || 0))})`;
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
-  // A quiet accent block behind the title keeps text readable on busy art.
-  ctx.fillStyle = rgba(accent, 0.2);
-  roundedRect(ctx, 72, 70, WIDTH - 144, 210, 28);
-  ctx.fill();
 
-  const titleText = fillTemplate(title, values).replace(/\s+/g, ' ').trim();
-  const subtitleText = fillTemplate(subtitle ?? '', values).replace(/\s+/g, ' ').trim();
-  ctx.save();
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.shadowColor = 'rgba(0,0,0,0.55)';
-  ctx.shadowBlur = 16;
-  ctx.shadowOffsetY = 4;
-  ctx.fillStyle = '#ffffff';
-  const titleSize = fitFont(ctx, titleText, WIDTH - 200, 82, 42);
-  ctx.font = `${titleSize}px ${FONT}`;
-  ctx.fillText(titleText, WIDTH / 2, subtitleText ? 148 : 175);
-  if (subtitleText) {
-    ctx.shadowBlur = 10;
-    ctx.fillStyle = 'rgba(255,255,255,0.92)';
-    const subSize = fitFont(ctx, subtitleText, WIDTH - 260, 30, 20);
-    ctx.font = `${subSize}px ${FONT}`;
-    ctx.fillText(subtitleText, WIDTH / 2, 224);
+  const titleText = showTitle ? fillTemplate(title, values).replace(/\s+/g, ' ').trim() : '';
+  const subtitleText = showSubtitle ? fillTemplate(subtitle ?? '', values).replace(/\s+/g, ' ').trim() : '';
+  if (titleText || subtitleText) {
+    // A quiet accent block behind the title keeps text readable on busy art.
+    ctx.fillStyle = rgba(accent, 0.2);
+    roundedRect(ctx, 72, 70, WIDTH - 144, 210, 28);
+    ctx.fill();
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 4;
+    ctx.fillStyle = '#ffffff';
+    if (titleText) {
+      const titleSize = fitFont(ctx, titleText, WIDTH - 200, 82, 42);
+      ctx.font = `${titleSize}px ${FONT}`;
+      ctx.fillText(titleText, WIDTH / 2, subtitleText ? 148 : 175);
+    }
+    if (subtitleText) {
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      const subSize = fitFont(ctx, subtitleText, WIDTH - 260, 30, 20);
+      ctx.font = `${subSize}px ${FONT}`;
+      ctx.fillText(subtitleText, WIDTH / 2, titleText ? 224 : 175);
+    }
+    ctx.restore();
   }
-  ctx.restore();
 
-  await drawAvatar(ctx, avatarUrl, accent);
-  drawNameBox(ctx, String(name ?? '').slice(0, 80) || 'Član', hex(nameColor, DEFAULT_BANNER.nameColor));
+  const avatarPx = Math.max(24, Math.round(WIDTH * layout.avatarSize));
+  await drawAvatar(ctx, avatarUrl, WIDTH * layout.avatarX, HEIGHT * layout.avatarY, avatarPx, accent);
+  const namePx = Math.max(16, Math.round(HEIGHT * layout.nameSize));
+  drawNameBox(ctx, String(name ?? '').slice(0, 80) || 'Član', WIDTH * layout.nameX, HEIGHT * layout.nameY, namePx, hex(nameColor, DEFAULT_BANNER.nameColor));
   return canvas.toBuffer('image/png');
 }
 
