@@ -35,6 +35,7 @@ export const DEFAULT_BANNER = {
   nameX: 0.55,
   nameY: 0.75,
   nameSize: 0.074,
+  nameWidth: 0.32,
 };
 
 const backgroundCache = new Map(); // url -> { at, image }
@@ -93,6 +94,7 @@ export function normalizeBanner(raw, defaults = {}) {
     nameX: clamp(raw.nameX, 0, 1, base.nameX),
     nameY: clamp(raw.nameY, 0, 1, base.nameY),
     nameSize: clamp(raw.nameSize, 0.03, 0.2, base.nameSize),
+    nameWidth: clamp(raw.nameWidth, 0.1, 0.8, base.nameWidth),
   };
 }
 
@@ -189,11 +191,11 @@ async function drawAvatar(ctx, url, cx, cy, size, accent) {
   ctx.restore();
 }
 
-function drawNameBox(ctx, name, cx, cy, fontPx, nameColor) {
+function drawNameBox(ctx, name, cx, cy, fontPx, widthPx, nameColor) {
   ctx.save();
   ctx.font = `${fontPx}px ${FONT}`;
   const height = Math.max(48, Math.round(fontPx * 2.1));
-  const width = Math.min(WIDTH - 48, Math.max(200, ctx.measureText(name).width + 96));
+  const width = Math.min(WIDTH - 48, Math.max(120, widthPx));
   const x = Math.min(WIDTH - 24 - width, Math.max(24, cx - width / 2));
   const y = Math.min(HEIGHT - 24 - height, Math.max(24, cy - height / 2));
   roundedRect(ctx, x, y, width, height, height / 2);
@@ -202,7 +204,7 @@ function drawNameBox(ctx, name, cx, cy, fontPx, nameColor) {
   ctx.fillStyle = nameColor;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const size = fitFont(ctx, name, width - 48, fontPx, 18);
+  const size = fitFont(ctx, name, width - 48, fontPx, 14);
   ctx.font = `${size}px ${FONT}`;
   ctx.fillText(name, x + width / 2, y + height / 2 + 1);
   ctx.restore();
@@ -226,6 +228,7 @@ export async function renderWelcomeBanner({
   nameX = DEFAULT_BANNER.nameX,
   nameY = DEFAULT_BANNER.nameY,
   nameSize = DEFAULT_BANNER.nameSize,
+  nameWidth = DEFAULT_BANNER.nameWidth,
   memberCount,
 } = {}) {
   const canvas = createCanvas(WIDTH, HEIGHT);
@@ -244,6 +247,7 @@ export async function renderWelcomeBanner({
     nameX: clamp(nameX, 0, 1, DEFAULT_BANNER.nameX),
     nameY: clamp(nameY, 0, 1, DEFAULT_BANNER.nameY),
     nameSize: clamp(nameSize, 0.03, 0.2, DEFAULT_BANNER.nameSize),
+    nameWidth: clamp(nameWidth, 0.1, 0.8, DEFAULT_BANNER.nameWidth),
   };
 
   ctx.fillStyle = '#1c1e23';
@@ -290,7 +294,8 @@ export async function renderWelcomeBanner({
   const avatarPx = Math.max(24, Math.round(WIDTH * layout.avatarSize));
   await drawAvatar(ctx, avatarUrl, WIDTH * layout.avatarX, HEIGHT * layout.avatarY, avatarPx, accent);
   const namePx = Math.max(16, Math.round(HEIGHT * layout.nameSize));
-  drawNameBox(ctx, String(name ?? '').slice(0, 80) || 'Član', WIDTH * layout.nameX, HEIGHT * layout.nameY, namePx, hex(nameColor, DEFAULT_BANNER.nameColor));
+  const nameWidthPx = Math.round(WIDTH * layout.nameWidth);
+  drawNameBox(ctx, String(name ?? '').slice(0, 80) || 'Član', WIDTH * layout.nameX, HEIGHT * layout.nameY, namePx, nameWidthPx, hex(nameColor, DEFAULT_BANNER.nameColor));
   return canvas.toBuffer('image/png');
 }
 

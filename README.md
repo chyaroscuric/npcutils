@@ -208,7 +208,7 @@ Dashboard → **Besplatne igre** prati Epic Games i Steam. Kad se pojavi nova be
 
 ## 🖼️ Welcome banner
 
-Uz običnu welcome poruku bot može nacrtati banner: pozadinska slika, avatar novog člana u krugu i njegovo ime u traci. Na dashboardu pod **Dobrodošlica i role** otvori **Dizajner bannera**: učitaj sliku s računala (PNG, JPG, WebP ili GIF do 8 MB), ili zalijepi URL, pa **povuci krug s avatarom i ime** tamo gdje želiš. Možeš mijenjati i veličinu avatara i imena te isključiti naslov/podnaslov ako su već dio slike. Uključi **Pošalji samo sliku bannera** ako želiš da bot pošalje samo PNG, bez embeda i teksta. Bot sliku automatski obreže na 1024×512 i spremi ju u bazu, pa radi i kad je dashboard iza BYOT proxyja.
+Uz običnu welcome poruku bot može nacrtati banner: pozadinska slika, avatar novog člana u krugu i njegovo ime u traci. Na dashboardu pod **Dobrodošlica i role** otvori **Dizajner bannera**: učitaj sliku s računala (PNG, JPG, WebP ili GIF do 8 MB), ili zalijepi URL, pa **povuci krug s avatarom i ime** tamo gdje želiš. Možeš mijenjati veličinu avatara, veličinu i širinu imena te isključiti naslov/podnaslov ako su već dio slike. Ime se automatski smanji da stane u fiksnu širinu, pa dugi nadimci ne razvlače banner. Uključi **Pošalji samo sliku bannera** ako želiš da bot pošalje samo PNG, bez embeda i teksta. Bot sliku automatski obreže na 1024×512 i spremi ju u bazu, pa radi i kad je dashboard iza BYOT proxyja.
 
 Isto možeš postaviti naredbom:
 

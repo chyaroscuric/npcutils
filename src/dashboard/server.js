@@ -467,6 +467,7 @@ export function startDashboard(client, port) {
         nameX: banner.nameX,
         nameY: banner.nameY,
         nameSize: banner.nameSize,
+        nameWidth: banner.nameWidth,
         memberCount: req.guild.memberCount,
       });
       res.type('png').send(buffer);

@@ -75,6 +75,7 @@ export async function buildWelcomePayload(member, inviterId) {
       nameX: bannerCfg.nameX,
       nameY: bannerCfg.nameY,
       nameSize: bannerCfg.nameSize,
+      nameWidth: bannerCfg.nameWidth,
       memberCount: member.guild.memberCount,
     });
     return welcomePayload(member, inviterId, { banner });
@@ -149,6 +150,7 @@ export async function buildGoodbyePayload(member) {
       nameX: bannerCfg.nameX,
       nameY: bannerCfg.nameY,
       nameSize: bannerCfg.nameSize,
+      nameWidth: bannerCfg.nameWidth,
       memberCount: member.guild.memberCount,
     });
     return goodbyePayload(member, { banner });

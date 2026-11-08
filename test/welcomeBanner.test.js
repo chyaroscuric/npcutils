@@ -42,6 +42,7 @@ test('banner layout positions and sizes are clamped', () => {
     nameX: 0.4,
     nameY: 0.6,
     nameSize: 0.01,
+    nameWidth: 2,
     showTitle: false,
     showSubtitle: false,
     onlyImage: true,
@@ -52,6 +53,7 @@ test('banner layout positions and sizes are clamped', () => {
   assert.equal(banner.nameX, 0.4);
   assert.equal(banner.nameY, 0.6);
   assert.equal(banner.nameSize, 0.03);
+  assert.equal(banner.nameWidth, 0.8);
   assert.equal(banner.showTitle, false);
   assert.equal(banner.showSubtitle, false);
   assert.equal(banner.onlyImage, true);

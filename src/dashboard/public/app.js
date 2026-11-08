@@ -1703,6 +1703,7 @@
       nameX: banner.nameX ?? 0.55,
       nameY: banner.nameY ?? 0.75,
       nameSize: banner.nameSize ?? 0.074,
+      nameWidth: banner.nameWidth ?? 0.32,
     };
     return html`<div class="cols cols-form-right">
       <section class="card" aria-labelledby="msg-h">
@@ -1729,7 +1730,7 @@
                 <label class="toggle"><input type="checkbox" role="switch" name="bannerOnlyImage" ${banner.onlyImage ? raw('checked') : ''}><span class="track" aria-hidden="true"></span><span>Pošalji samo sliku bannera (bez embeda i teksta)</span></label>
                 <p class="help">Kad je uključeno, bot pošalje samo PNG banner. Naslov, podnaslov i obična poruka se ne šalju.</p>
                 <div class="banner-designer">
-                  <div class="banner-canvas" data-banner-canvas style="--avatar-size:${layout.avatarSize};--name-size:${layout.nameSize};--overlay:${banner.overlay ?? 0.32}">
+                  <div class="banner-canvas" data-banner-canvas style="--avatar-size:${layout.avatarSize};--name-size:${layout.nameSize};--name-width:${layout.nameWidth};--overlay:${banner.overlay ?? 0.32}">
                     <img data-banner-bg src="${banner.backgroundUrl || ''}" alt="" ${banner.backgroundUrl ? '' : raw('hidden')}>
                     <div class="banner-overlay"></div>
                     <div class="banner-drag-avatar" data-drag="avatar" style="left:${layout.avatarX * 100}%;top:${layout.avatarY * 100}%;background-image:${sampleAvatar ? `url('${sampleAvatar}')` : 'none'};border-color:${banner.accentColor || '#f472b6'}"><span class="banner-resize" data-resize="avatar" aria-hidden="true"></span></div>
@@ -1744,6 +1745,7 @@
                     <input type="hidden" name="bannerNameX" value="${layout.nameX}">
                     <input type="hidden" name="bannerNameY" value="${layout.nameY}">
                     <input type="hidden" name="bannerNameSize" value="${layout.nameSize}">
+                    <input type="hidden" name="bannerNameWidth" value="${layout.nameWidth}">
                     <label class="btn">${icon('ti-upload')}Učitaj sliku<input type="file" data-banner-file accept="image/png,image/jpeg,image/webp,image/gif" hidden></label>
                     <button type="button" class="btn" data-action="banner-remove">${icon('ti-trash')}Ukloni sliku</button>
                     <input class="input" data-banner-external type="url" maxlength="2048" value="${banner.backgroundUrl && !String(banner.backgroundUrl).startsWith('data:') ? banner.backgroundUrl : ''}" placeholder="ili zalijepi URL slike">
@@ -1753,6 +1755,7 @@
                 <div class="banner-controls">
                   <label class="banner-control"><span>Veličina avatara</span><input type="range" data-banner-size="avatar" min="0.05" max="0.4" step="0.005" value="${layout.avatarSize}"></label>
                   <label class="banner-control"><span>Veličina teksta</span><input type="range" data-banner-size="name" min="0.03" max="0.2" step="0.002" value="${layout.nameSize}"></label>
+                  <label class="banner-control"><span>Širina imena</span><input type="range" data-banner-size="nameWidth" min="0.1" max="0.8" step="0.005" value="${layout.nameWidth}"></label>
                   ${field({ name: 'bannerOverlay', label: 'Zatamnjenje', id: id.boverlay,
                     control: html`<input class="input" id="${id.boverlay}" name="bannerOverlay" data-banner-overlay type="range" min="0" max="0.8" step="0.05" value="${banner.overlay ?? 0.32}">` })}
                 </div>
@@ -1844,6 +1847,7 @@
     formValue(f, 'bannerShowTitle'), formValue(f, 'bannerShowSubtitle'),
     formValue(f, 'bannerAvatarX'), formValue(f, 'bannerAvatarY'), formValue(f, 'bannerAvatarSize'),
     formValue(f, 'bannerNameX'), formValue(f, 'bannerNameY'), formValue(f, 'bannerNameSize'),
+    formValue(f, 'bannerNameWidth'),
   ]);
   function bannerFormValue(f) {
     return {
@@ -1863,6 +1867,7 @@
       nameX: Number(formValue(f, 'bannerNameX') ?? 0.55),
       nameY: Number(formValue(f, 'bannerNameY') ?? 0.75),
       nameSize: Number(formValue(f, 'bannerNameSize') ?? 0.074),
+      nameWidth: Number(formValue(f, 'bannerNameWidth') ?? 0.32),
     };
   }
   let bannerDrag = null;
@@ -4820,10 +4825,15 @@
       if (size) {
         const form = size.closest('form');
         const canvas = form?.querySelector('[data-banner-canvas]');
-        const kind = size.dataset.bannerSize;
-        const hidden = form?.querySelector(`input[name="banner${kind === 'avatar' ? 'Avatar' : 'Name'}Size"]`);
+        const map = {
+          avatar: ['bannerAvatarSize', '--avatar-size'],
+          name: ['bannerNameSize', '--name-size'],
+          nameWidth: ['bannerNameWidth', '--name-width'],
+        };
+        const [inputName, cssVar] = map[size.dataset.bannerSize] || [];
+        const hidden = inputName ? form?.querySelector(`input[name="${inputName}"]`) : null;
         if (hidden) hidden.value = size.value;
-        if (canvas) canvas.style.setProperty(kind === 'avatar' ? '--avatar-size' : '--name-size', size.value);
+        if (canvas && cssVar) canvas.style.setProperty(cssVar, size.value);
       }
       const overlay = e.target.closest && e.target.closest('[data-banner-overlay]');
       if (overlay) {
