@@ -4266,12 +4266,12 @@
                   help: 'Koristi se kad za pojedinu vrstu nije odabran poseban kanal.',
                   control: selectField({ id: id.ch, name: 'channelId', options: textChannelOptions(g), value: c.channelId || '', placeholder: 'Koristi posebne kanale ispod', emptyText: 'Server nema tekstualnih kanala.' }) })}
                 ${field({ name: 'roleId', label: 'Rola za spominjanje', id: id.role,
-                  help: 'Neobavezno. Rola se spominje uz svaku obavijest.',
-                  control: selectField({ id: id.role, name: 'roleId', options: [{ value: '', label: 'Bez role' }, ...roleOptions(g)], value: c.roleId || '', placeholder: 'Bez role' }) })}
+                  help: 'Neobavezno. Rola, @everyone ili @here spominje se iznad svake obavijesti.',
+                  control: selectField({ id: id.role, name: 'roleId', options: [{ value: '', label: 'Bez role' }, { value: 'everyone', label: '@everyone' }, { value: 'here', label: '@here' }, ...roleOptions(g)], value: c.roleId || '', placeholder: 'Bez role' }) })}
                 <div class="field">
                   <label class="label" for="${id.msg}">Poruka</label>
                   <textarea class="input" id="${id.msg}" name="message" rows="4" maxlength="2000" placeholder="${s.defaultMessage}" aria-describedby="${id.msg}-help">${c.message || ''}</textarea>
-                  <p class="help" id="${id.msg}-help">Varijable: {account}, {username}, {platform}, {event}, {title}, {url}, {game}, {followers}. Ostavi prazno za zadanu poruku.</p>
+                  <p class="help" id="${id.msg}-help">Tekst iznad kartice s videom. Varijable: {account}, {username}, {platform}, {event}, {title}, {url}, {game}, {followers}. Ostavi prazno za zadanu poruku.</p>
                 </div>
                 <div class="section-gap">
                   <h3 class="sub-title">Kanali po platformi i vrsti</h3>

@@ -194,7 +194,7 @@ Dashboard → **Obavijesti** prati javne YouTube, Twitch i TikTok račune i šal
 - Twitch počne stream (uključivo naslov i igru),
 - TikTok objavi novi video (broj videa) ili počne live.
 
-Prva provjera samo zapamti stanje, a svaka sljedeća promjena šalje obavijest. Možeš odabrati glavni kanal, role koja se spominje, tekst poruke i pojedinačno uključiti **Video** i **Uživo** za svaki račun. Za svaku platformu i vrstu (npr. YouTube video, YouTube live, Twitch live, TikTok video, TikTok live) možeš odabrati i poseban kanal; ako ostaviš prazno, koristi se glavni kanal. Provjera ide svakih 5 minuta (`SOCIAL_POLL_MINUTES`). TikTok i YouTube link ponekad vode na profil jer javna stranica ne daje direktan link na video bez API-ja.
+Prva provjera samo zapamti stanje, a svaka sljedeća promjena šalje obavijest. Možeš odabrati glavni kanal, role koja se spominje, tekst poruke i pojedinačno uključiti **Video** i **Uživo** za svaki račun. Za svaku platformu i vrstu (npr. YouTube video, YouTube live, Twitch live, TikTok video, TikTok live) možeš odabrati i poseban kanal; ako ostaviš prazno, koristi se glavni kanal. Provjera ide svakih 5 minuta (`SOCIAL_POLL_MINUTES`). Obavijest izgleda kao kartica: tekst poruke (uz @everyone, @here ili rolu), autor s avatarom, naslov videa/streama, velika slika (YouTube thumbnail, TikTok naslovnica, Twitch pregled streama) i gumbi **Pogledaj video** / **Gledaj stream** i **Otvori profil**. Ako TikTok ne vrati zadnji video, obavijest vodi na profil.
 
 ## 🎁 Besplatne igre
 

@@ -5,7 +5,7 @@
 // baseline; notifications start with the next change. All state is persisted in the
 // guild config so a bot restart does not repeat an alert.
 import crypto from 'node:crypto';
-import { EmbedBuilder } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
 import * as db from '../db.js';
 import { logActivity } from './activity.js';
 import { cleanAccount } from './socialStats.js';
@@ -25,7 +25,11 @@ export const ROUTE_KEYS = Object.entries(PLATFORMS).flatMap(([platform, def]) =>
   def.events.map((event) => `${platform}:${event}`),
 );
 
-export const DEFAULT_MESSAGE = '{account} je {event} na **{platform}**!\\n{title}\\n{url}';
+export const DEFAULT_MESSAGE = '**{account}** je {event}, brzo da svi pogledate!';
+
+// Special `roleId` values that mention everyone instead of a role.
+export const MENTION_EVERYONE = 'everyone';
+export const MENTION_HERE = 'here';
 
 const DEFAULT_STATE = {
   lastVideoId: null,
@@ -309,6 +313,76 @@ export function parseTikTokProfile(html) {
   };
 }
 
+// The public creator embed (`/embed/@user`) lists the latest videos with their
+// description and cover. Pinned videos can come first, so the newest one is picked by
+// ID (TikTok IDs grow with time).
+export function parseTikTokEmbed(html) {
+  const text = String(html ?? '');
+  const json = text.match(/<script id="__FRONTITY_CONNECT_STATE__"[^>]*>([\s\S]*?)<\/script>/)?.[1];
+  let list = null;
+  if (json) {
+    try {
+      const data = JSON.parse(json);
+      for (const value of Object.values(data?.source?.data ?? {})) {
+        if (Array.isArray(value?.videoList)) {
+          list = value.videoList;
+          break;
+        }
+      }
+    } catch {
+      list = null;
+    }
+  }
+  if (!list) return { latest: null };
+  let latest = null;
+  for (const item of list) {
+    const id = String(item?.id ?? '');
+    if (!/^\d{6,}$/.test(id) || item.privateItem) continue;
+    if (!latest || BigInt(id) > BigInt(latest.id)) latest = item;
+  }
+  if (!latest) return { latest: null };
+  const account = latest.authorUniqueId || null;
+  const id = String(latest.id);
+  return {
+    latest: {
+      videoId: id,
+      title: str(latest.desc, 500),
+      url: account ? `https://www.tiktok.com/@${account}/video/${id}` : `https://www.tiktok.com/video/${id}`,
+      thumbnail: latest.originCoverUrl || latest.coverUrl || null,
+      publishedAt: tikTokIdTime(id),
+    },
+  };
+}
+
+// The first 32 bits of a TikTok video ID are the upload time in seconds.
+export function tikTokIdTime(id) {
+  try {
+    const seconds = Number(BigInt(id) >> 32n);
+    return seconds > 1_400_000_000 ? seconds * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+export function isNewerId(next, previous) {
+  if (!next) return false;
+  if (!previous) return true;
+  try {
+    return BigInt(next) > BigInt(previous);
+  } catch {
+    return next !== previous;
+  }
+}
+
+export function parseYouTubeAvatar(html) {
+  const url = String(html ?? '').match(/https:\/\/yt3\.(?:ggpht|googleusercontent)\.com\/[\w\-./=~]+/)?.[0];
+  return url ? url.replace(/=s\d+[^/]*$/, '=s176-c-k-c0x00ffffff-no-rj') : null;
+}
+
+export function twitchPreview(user, now = Date.now()) {
+  return `https://static-cdn.jtvnw.net/previews-ttv/live_user_${String(user).toLowerCase()}-1280x720.jpg?t=${Math.floor(now / 60_000)}`;
+}
+
 export function parseTwitchUptime(text) {
   const value = String(text ?? '').trim();
   if (!value || /offline|not found|does not exist|error/i.test(value)) return { live: false, text: value };
@@ -351,17 +425,18 @@ async function resolveYouTube(account, state) {
     url = `https://www.youtube.com/@${cleanAccount(raw)}`;
   }
   const html = await getText(url, { Accept: 'text/html' });
+  const avatarUrl = parseYouTubeAvatar(html);
   const channelId = html.match(/"channelId"\s*:\s*"(UC[\w-]{20,})"/)?.[1]
     ?? html.match(/"externalId"\s*:\s*"(UC[\w-]{20,})"/)?.[1]
     ?? html.match(/channel\/(UC[\w-]{20,})/)?.[1];
   if (!channelId) throw new Error('Ne mogu pronaći YouTube kanal. Provjeri @ime ili link.');
-  return { channelId, url: `https://www.youtube.com/channel/${channelId}` };
+  return { channelId, avatarUrl, url: `https://www.youtube.com/channel/${channelId}` };
 }
 
 async function fetchYouTube(account, state, events) {
   const resolved = await resolveYouTube(account, state);
   state.channelId = resolved.channelId;
-  const out = { account, url: resolved.url, name: null, upload: null, live: null };
+  const out = { account, url: resolved.url, name: null, upload: null, live: null, avatarUrl: resolved.avatarUrl ?? null };
   let error = null;
   if (events.upload) {
     try {
@@ -377,6 +452,7 @@ async function fetchYouTube(account, state, events) {
     try {
       const html = await getText(`https://www.youtube.com/channel/${encodeURIComponent(resolved.channelId)}/live`, { Accept: 'text/html' });
       out.live = parseYouTubeLive(html);
+      out.avatarUrl = out.avatarUrl ?? parseYouTubeAvatar(html);
     } catch (err) {
       error = error ?? err;
     }
@@ -410,53 +486,99 @@ async function fetchTikTok(account) {
   return data;
 }
 
+async function fetchTikTokLatest(account) {
+  try {
+    const html = await getText(`https://www.tiktok.com/embed/@${encodeURIComponent(cleanAccount(account))}`, { Accept: 'text/html' });
+    return parseTikTokEmbed(html).latest;
+  } catch {
+    return null;
+  }
+}
+
 // ---------- notifications ----------
 
 export function eventText(event) {
   return event === 'live' ? 'počeo/la stream' : 'objavio/la novi video';
 }
 
+export function profileUrl(account) {
+  const user = encodeURIComponent(account.account);
+  if (account.platform === 'twitch') return `https://www.twitch.tv/${user}`;
+  if (account.platform === 'tiktok') return `https://www.tiktok.com/@${user}`;
+  if (/^UC[\w-]{20,}$/.test(account.account)) return `https://www.youtube.com/channel/${user}`;
+  return `https://www.youtube.com/@${user}`;
+}
+
+const isHttp = (value) => typeof value === 'string' && /^https?:\/\//i.test(value);
+
+// Bare links in the text above the card would make Discord add a second preview.
+function suppressLinks(text) {
+  return text.replace(/(^|[^(<])(https?:\/\/[^\s>)]+)/g, '$1<$2>');
+}
+
+function mention(roleId) {
+  if (!roleId) return null;
+  if (roleId === MENTION_EVERYONE) return { text: '@everyone', allowed: { parse: ['everyone'] } };
+  if (roleId === MENTION_HERE) return { text: '@here', allowed: { parse: ['everyone'] } };
+  return { text: `<@&${roleId}>`, allowed: { roles: [roleId] } };
+}
+
+// Builds the alert: a short announcement (with the optional mention) above a card with
+// the creator, the video/stream title, a large preview image and link buttons.
 export function buildNotification(cfg, account, event, data = {}) {
   const platform = PLATFORMS[account.platform] ?? PLATFORMS.youtube;
-  const url = data.url ?? null;
-  const title = data.title || (event === 'live' ? 'Uživo' : 'Novi video');
+  const profile = isHttp(data.profileUrl) ? data.profileUrl : profileUrl(account);
+  const url = isHttp(data.url) ? data.url : profile;
+  const name = account.label || data.name || account.account;
+  const title = str(data.title, 256) || (event === 'live' ? `${name} je uživo` : 'Novi video');
   const values = {
-    account: account.label || data.name || account.account,
+    account: name,
     username: account.account,
     platform: platform.label,
     event: eventText(event),
     title,
-    url: url ?? '',
+    url,
     game: data.game ?? '',
     followers: data.followers != null ? new Intl.NumberFormat('hr-HR').format(data.followers) : '',
   };
   const template = cfg.message || DEFAULT_MESSAGE;
-  const description = fillTemplate(template, values)
+  const text = suppressLinks(fillTemplate(template, values))
     .replace(/\n{3,}/g, '\n\n')
-    .trim()
-    .slice(0, 4096) || title;
+    .trim();
+
   const embed = new EmbedBuilder()
     .setColor(platform.color)
-    .setTitle(event === 'live' ? `🔴 ${platform.label}: stream je počeo` : `🎬 Novi ${platform.label} video`)
-    .setDescription(description)
-    .setFooter({ text: `${platform.label} · ${account.label || account.account}` })
-    .setTimestamp();
-  if (url) embed.setURL(url);
-  if (data.thumbnail) embed.setImage(data.thumbnail);
-  else if (data.avatarUrl) embed.setThumbnail(data.avatarUrl);
-  if (data.game) embed.addFields({ name: 'Igra', value: String(data.game).slice(0, 1024), inline: true });
-  if (data.published) {
-    const at = Date.parse(data.published);
-    if (Number.isFinite(at)) embed.addFields({ name: 'Objavljeno', value: `<t:${Math.floor(at / 1000)}:R>`, inline: true });
+    .setAuthor({ name: str(name, 256), url: profile, ...(isHttp(data.avatarUrl) ? { iconURL: data.avatarUrl } : {}) })
+    .setTitle(title)
+    .setURL(url)
+    .setFooter({ text: event === 'live' ? `🔴 Uživo na ${platform.label}` : platform.label });
+  const lines = [];
+  if (event === 'live' && data.game) lines.push(`🎮 ${str(data.game, 200)}`);
+  if (data.followers != null) lines.push(`👥 ${values.followers} pratitelja`);
+  if (lines.length) embed.setDescription(lines.join(' · '));
+  if (isHttp(data.thumbnail)) embed.setImage(data.thumbnail);
+  else if (isHttp(data.avatarUrl)) embed.setThumbnail(data.avatarUrl);
+  const at = Number.isFinite(data.publishedAt) ? data.publishedAt : Date.parse(data.published ?? '');
+  embed.setTimestamp(Number.isFinite(at) ? at : Date.now());
+
+  const buttons = [
+    new ButtonBuilder()
+      .setStyle(ButtonStyle.Link)
+      .setLabel(event === 'live' ? 'Gledaj stream' : 'Pogledaj video')
+      .setURL(url),
+  ];
+  if (profile !== url) {
+    buttons.push(new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(`Otvori ${platform.label}`).setURL(profile));
   }
-  if (data.followers != null) {
-    embed.addFields({ name: 'Pratitelji', value: values.followers, inline: true });
-  }
-  const payload = { embeds: [embed], allowedMentions: { parse: [] } };
-  if (cfg.roleId) {
-    payload.content = `<@&${cfg.roleId}>`;
-    payload.allowedMentions = { roles: [cfg.roleId] };
-  }
+
+  const ping = mention(cfg.roleId);
+  const content = [ping?.text, text].filter(Boolean).join('\n').slice(0, 2000);
+  const payload = {
+    embeds: [embed],
+    components: [new ActionRowBuilder().addComponents(buttons)],
+    allowedMentions: ping?.allowed ?? { parse: [] },
+  };
+  if (content) payload.content = content;
   return payload;
 }
 
@@ -469,6 +591,8 @@ async function checkAccount(cfg, account, { notify = true } = {}) {
   if (platform === 'youtube') {
     const data = await fetchYouTube(account.account, state, account.events);
     if (data.name) state.name = data.name;
+    if (data.avatarUrl) state.avatarUrl = data.avatarUrl;
+    const common = { name: state.name, avatarUrl: state.avatarUrl, profileUrl: data.url };
     if (data.live) {
       if (data.live.live) {
         const liveId = data.live.videoId;
@@ -477,9 +601,10 @@ async function checkAccount(cfg, account, { notify = true } = {}) {
           notifications.push({
             event: 'live',
             data: {
-              title: data.live.title || 'Uživo',
+              ...common,
+              title: data.live.title || null,
               url: liveId ? `https://www.youtube.com/watch?v=${liveId}` : data.url,
-              thumbnail: liveId ? `https://i.ytimg.com/vi/${liveId}/hqdefault.jpg` : null,
+              thumbnail: liveId ? `https://i.ytimg.com/vi/${liveId}/hqdefault_live.jpg` : null,
             },
           });
         }
@@ -506,20 +631,26 @@ async function checkAccount(cfg, account, { notify = true } = {}) {
         upload.videoId !== state.lastVideoId &&
         (state.lastVideoAt == null || (upload.publishedAt ?? 0) > state.lastVideoAt);
       if (notify && !firstRun && isNew && !(data.live?.live && data.live.videoId === upload.videoId)) {
-        notifications.push({ event: 'upload', data: upload });
+        notifications.push({ event: 'upload', data: { ...common, ...upload } });
       }
       state.lastVideoId = upload.videoId;
       state.lastVideoTitle = upload.title;
       state.lastVideoAt = upload.publishedAt ?? Date.now();
       state.title = upload.title;
-      state.avatarUrl = state.avatarUrl ?? upload.thumbnail;
     }
   } else if (platform === 'twitch') {
     const data = await fetchTwitch(account.account);
     if (notify && !firstRun && data.live && !state.live) {
       notifications.push({
         event: 'live',
-        data: { title: data.title || 'Uživo', game: data.game, url: data.url, avatarUrl: data.avatarUrl },
+        data: {
+          title: data.title || null,
+          game: data.game,
+          url: data.url,
+          profileUrl: data.url,
+          avatarUrl: data.avatarUrl,
+          thumbnail: twitchPreview(data.account),
+        },
       });
     }
     state.live = data.live;
@@ -530,25 +661,35 @@ async function checkAccount(cfg, account, { notify = true } = {}) {
     if (data.live) state.lastLiveAt = Date.now();
   } else if (platform === 'tiktok') {
     const data = await fetchTikTok(account.account);
+    const common = { name: data.name, avatarUrl: data.avatarUrl, profileUrl: data.url, followers: data.followers };
     if (notify && !firstRun && data.live && !state.live) {
-      notifications.push({
-        event: 'live',
-        data: { title: 'Uživo na TikToku', url: data.url, avatarUrl: data.avatarUrl, followers: data.followers },
-      });
+      notifications.push({ event: 'live', data: { ...common, title: null, url: `${data.url}/live` } });
     }
     const grew = data.videos != null && state.videoCount != null && data.videos > state.videoCount;
-    if (notify && !firstRun && grew) {
+    // The profile page only has the video count; the creator embed has the latest video.
+    const latest = account.events.upload !== false && (grew || !state.lastVideoId || firstRun)
+      ? await fetchTikTokLatest(account.account)
+      : null;
+    const newer = latest && state.lastVideoId ? isNewerId(latest.videoId, state.lastVideoId) : grew;
+    if (notify && !firstRun && newer) {
       notifications.push({
         event: 'upload',
-        data: { title: `Novi video (ukupno ${data.videos})`, url: data.url, thumbnail: data.avatarUrl, followers: data.followers },
+        data: latest
+          ? { ...common, ...latest, title: latest.title || null }
+          : { ...common, title: `Novi video (ukupno ${data.videos})`, url: data.url },
       });
+    }
+    if (latest && isNewerId(latest.videoId, state.lastVideoId)) {
+      state.lastVideoId = latest.videoId;
+      state.lastVideoTitle = latest.title || null;
+      state.lastVideoAt = latest.publishedAt ?? Date.now();
     }
     state.videoCount = data.videos;
     state.live = data.live;
     state.name = data.name;
     state.avatarUrl = data.avatarUrl;
     state.followers = data.followers;
-    state.title = data.live ? 'Uživo' : state.title;
+    state.title = data.live ? 'Uživo' : state.lastVideoTitle || state.title;
     if (data.live) state.lastLiveAt = Date.now();
   }
 
@@ -595,19 +736,25 @@ export async function testNotification(guild, accountId = null) {
   const cfg = getConfig(guild.id);
   const account = cfg.accounts.find((a) => a.id === accountId) ?? cfg.accounts[0];
   if (!account) throw new Error('Prvo dodaj barem jedan račun.');
-  const event = account.events.live ? 'live' : 'upload';
+  const st = account.state;
+  const event = account.events.upload && st.lastVideoId ? 'upload' : account.events.live ? 'live' : 'upload';
   const channel = targetChannel(guild, cfg, account.platform, event);
   if (!channel) throw new Error('Odaberi i spremi kanal za tu vrstu obavijesti.');
-  const url = account.platform === 'twitch'
-    ? `https://www.twitch.tv/${account.account}`
-    : account.platform === 'youtube'
-      ? `https://www.youtube.com/@${account.account}`
-      : `https://www.tiktok.com/@${account.account}`;
+  const video = event === 'upload' && st.lastVideoId ? st.lastVideoId : null;
+  const videoUrl = video && account.platform === 'youtube'
+    ? `https://www.youtube.com/watch?v=${video}`
+    : video && account.platform === 'tiktok'
+      ? `https://www.tiktok.com/@${account.account}/video/${video}`
+      : null;
   const payload = buildNotification(cfg, account, event, {
-    title: 'Testna obavijest',
-    url,
-    avatarUrl: account.state.avatarUrl,
-    game: 'Test',
+    title: (video && st.lastVideoTitle) || 'Testna obavijest',
+    url: videoUrl || profileUrl(account),
+    name: st.name,
+    avatarUrl: st.avatarUrl,
+    thumbnail: account.platform === 'twitch'
+      ? twitchPreview(account.account)
+      : video && account.platform === 'youtube' ? `https://i.ytimg.com/vi/${video}/hqdefault.jpg` : null,
+    game: account.platform === 'twitch' ? st.game || 'Test' : null,
   });
   await channel.send(payload);
   return true;
