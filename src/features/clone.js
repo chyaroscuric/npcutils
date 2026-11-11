@@ -124,7 +124,7 @@ export function copyBotSettings(sourceId, targetId, roleMap, channelMap) {
     config.socialAlerts = {
       ...c.socialAlerts,
       channelId: ch(c.socialAlerts.channelId),
-      roleId: role(c.socialAlerts.roleId),
+      roleId: ['everyone', 'here'].includes(c.socialAlerts.roleId) ? c.socialAlerts.roleId : role(c.socialAlerts.roleId),
       accounts: (c.socialAlerts.accounts ?? []).map((account) => ({ ...account, state: {} })),
     };
   }

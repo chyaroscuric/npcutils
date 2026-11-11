@@ -62,14 +62,23 @@ Polls public pages and sends an embed when a tracked account changes state.
   The channel ID is resolved from the profile page and cached in `state.channelId`.
 - YouTube live: `/channel/<id>/live` page, `"videoDetails": { "isLive": true }`.
 - TikTok live: non-empty `roomId` on the public profile.
-- TikTok uploads: `videoCount` increase (the public page does not expose the latest video
-  ID without a signed API request, so the alert links to the profile).
+- TikTok uploads: the public creator embed `https://www.tiktok.com/embed/@<user>` lists
+  recent videos (`__FRONTITY_CONNECT_STATE__` → `videoList`). `parseTikTokEmbed()` picks the
+  newest by ID (pinned videos come first) and the alert shows its description and cover.
+  The embed is fetched only when `videoCount` grows (or no `lastVideoId` is stored yet);
+  if it fails, the alert falls back to the profile link.
 - Twitch live: DecAPI uptime, then title/game/avatar only while live.
 - First check is a baseline (`lastCheckedAt` null) and sends nothing.
 - A live stream that also appears in the YouTube RSS is marked as seen, so it produces
   one live alert instead of a live alert plus an upload alert.
-- `buildNotification()` supports `{account}`, `{username}`, `{platform}`, `{event}`,
-  `{title}`, `{url}`, `{game}`, `{followers}` and an optional role mention.
+- `buildNotification()` sends a card-style alert: the filled `message` template (plus the
+  optional mention: a role ID, `everyone` or `here`) as content, an embed with the creator
+  as author (avatar + profile link), the video/stream title as a linked title, a large
+  preview image (YouTube thumbnail, TikTok cover, Twitch live preview) and link buttons
+  ("Pogledaj video"/"Gledaj stream" + "Otvori <platforma>"). Bare URLs in the content are
+  wrapped in `<>` so Discord does not add a second preview. Template variables:
+  `{account}`, `{username}`, `{platform}`, `{event}`, `{title}`, `{url}`, `{game}`,
+  `{followers}`.
 - Per-platform/type channel overrides live in `config.socialAlerts.channels`
   (`youtube:upload`, `youtube:live`, `twitch:live`, `tiktok:upload`, `tiktok:live`).
   `targetChannel()` falls back to the main `channelId`.

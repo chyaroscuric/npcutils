@@ -926,7 +926,9 @@ export function startDashboard(client, port) {
       throw new UserError('Odaberi glavni kanal ili barem jedan kanal po vrsti obavijesti.');
     }
     let roleId = null;
-    if (body.roleId) {
+    if (body.roleId === socialAlerts.MENTION_EVERYONE || body.roleId === socialAlerts.MENTION_HERE) {
+      roleId = body.roleId;
+    } else if (body.roleId) {
       const role = req.guild.roles.cache.get(String(body.roleId));
       if (!role) throw new UserError('Odabrana rola više ne postoji.');
       roleId = role.id;

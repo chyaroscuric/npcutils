@@ -139,18 +139,77 @@ test('accounts can be added, updated and removed', () => {
   assert.equal(s.removeAccount('g1', account.id), false);
 });
 
-test('notification payload includes the role mention and platform fields', () => {
+test('notification payload is a card with mention, author, image and link buttons', () => {
   const account = { platform: 'twitch', account: 'xqc', label: 'xQc', events: { live: true }, state: {} };
   const payload = s.buildNotification({ roleId: 'r1', message: '' }, account, 'live', {
     title: 'Ranked',
     url: 'https://twitch.tv/xqc',
     game: 'Just Chatting',
     avatarUrl: 'https://example.com/a.jpg',
+    thumbnail: s.twitchPreview('xQc', 0),
   });
-  assert.equal(payload.content, '<@&r1>');
+  assert.equal(payload.content, '<@&r1>\n**xQc** je počeo/la stream, brzo da svi pogledate!');
   assert.deepEqual(payload.allowedMentions, { roles: ['r1'] });
   const embed = payload.embeds[0].toJSON();
-  assert.match(embed.title, /Twitch/);
+  assert.equal(embed.title, 'Ranked');
   assert.equal(embed.url, 'https://twitch.tv/xqc');
-  assert.equal(embed.fields[0].name, 'Igra');
+  assert.equal(embed.author.name, 'xQc');
+  assert.equal(embed.author.icon_url, 'https://example.com/a.jpg');
+  assert.match(embed.image.url, /live_user_xqc-1280x720/);
+  assert.match(embed.description, /Just Chatting/);
+  const buttons = payload.components[0].toJSON().components;
+  assert.equal(buttons[0].label, 'Gledaj stream');
+  assert.equal(buttons[0].url, 'https://twitch.tv/xqc');
+  assert.equal(buttons[1].url, 'https://www.twitch.tv/xqc');
+});
+
+test('notification supports @everyone and keeps custom links from previewing twice', () => {
+  const account = { platform: 'tiktok', account: 'antea', label: 'Antea', events: { upload: true }, state: {} };
+  const url = 'https://www.tiktok.com/@antea/video/7704834703446117662';
+  const payload = s.buildNotification({ roleId: 'everyone', message: '{account}: {title}\\n{url}' }, account, 'upload', {
+    title: 'andja napada',
+    url,
+    thumbnail: 'https://example.com/cover.jpg',
+  });
+  assert.equal(payload.content, `@everyone\nAntea: andja napada\n<${url}>`);
+  assert.deepEqual(payload.allowedMentions, { parse: ['everyone'] });
+  const embed = payload.embeds[0].toJSON();
+  assert.equal(embed.image.url, 'https://example.com/cover.jpg');
+  assert.equal(payload.components[0].toJSON().components[0].label, 'Pogledaj video');
+  const plain = s.buildNotification({ message: '' }, account, 'upload', {});
+  assert.deepEqual(plain.allowedMentions, { parse: [] });
+  assert.equal(plain.embeds[0].toJSON().url, 'https://www.tiktok.com/@antea');
+  assert.equal(plain.components[0].toJSON().components.length, 1);
+});
+
+const TIKTOK_EMBED = `<html><script id="__FRONTITY_CONNECT_STATE__" type="application/json">${JSON.stringify({
+  source: {
+    data: {
+      '/embed/@antea': {
+        videoList: [
+          { id: '7600000000000000000', desc: 'Prikvačeni', coverUrl: 'https://example.com/old.jpg', authorUniqueId: 'antea' },
+          { id: '7704834703446117662', desc: 'andja opasno napala japanca', coverUrl: 'https://example.com/new.jpg', authorUniqueId: 'antea' },
+          { id: '7700000000000000000', desc: 'Stariji', coverUrl: 'https://example.com/mid.jpg', authorUniqueId: 'antea' },
+        ],
+      },
+    },
+  },
+})}</script></html>`;
+
+test('TikTok embed parsing picks the newest video, not the pinned one', () => {
+  const { latest } = s.parseTikTokEmbed(TIKTOK_EMBED);
+  assert.equal(latest.videoId, '7704834703446117662');
+  assert.equal(latest.title, 'andja opasno napala japanca');
+  assert.equal(latest.url, 'https://www.tiktok.com/@antea/video/7704834703446117662');
+  assert.equal(latest.thumbnail, 'https://example.com/new.jpg');
+  assert.ok(latest.publishedAt > Date.parse('2020-01-01'));
+  assert.equal(s.parseTikTokEmbed('<html></html>').latest, null);
+  assert.equal(s.isNewerId('7704834703446117662', '7700000000000000000'), true);
+  assert.equal(s.isNewerId('7700000000000000000', '7704834703446117662'), false);
+});
+
+test('YouTube avatar is read from channel pages', () => {
+  const html = '{"avatar":{"thumbnails":[{"url":"https://yt3.ggpht.com/abc-DEF_1=s48-c-k-c0x00ffffff-no-rj"}]}}';
+  assert.equal(s.parseYouTubeAvatar(html), 'https://yt3.ggpht.com/abc-DEF_1=s176-c-k-c0x00ffffff-no-rj');
+  assert.equal(s.parseYouTubeAvatar('<html></html>'), null);
 });
